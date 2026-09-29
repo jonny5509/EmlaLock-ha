@@ -19,11 +19,9 @@ jobs:
 
       - name: Build HACS ZIP
         run: |
-          rm -rf build emlalock.zip
-          mkdir -p build/emlalock/custom_components
-          cp -r custom_components/emlalock build/emlalock/custom_components/
-          cd build
-          zip -r ../emlalock.zip emlalock
+          rm -f emlalock.zip
+          cd custom_components/emlalock
+          zip -r ../../emlalock.zip .
 
       - name: Upload ZIP to release
         uses: softprops/action-gh-release@v3
