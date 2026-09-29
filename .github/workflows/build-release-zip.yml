@@ -1,0 +1,33 @@
+name: Build HACS Release ZIP
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout released tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Build HACS ZIP
+        run: |
+          rm -rf build emlalock.zip
+          mkdir -p build/emlalock/custom_components
+          cp -r custom_components/emlalock build/emlalock/custom_components/
+          cd build
+          zip -r ../emlalock.zip emlalock
+
+      - name: Upload ZIP to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: emlalock.zip
+          fail_on_unmatched_files: true
