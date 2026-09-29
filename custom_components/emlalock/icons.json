@@ -1,0 +1,48 @@
+{
+  "entity": {
+    "sensor": {
+      "time_remaining": {
+        "default": "mdi:timer-sand"
+      },
+      "session": {
+        "default": "mdi:lock-check-outline"
+      },
+      "requirement_links": {
+        "default": "mdi:link-variant"
+      },
+      "maximum_duration": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "minimum_duration": {
+        "default": "mdi:timer-minus-outline"
+      },
+      "time_passed": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "button": {
+      "add_time": {
+        "default": "mdi:clock-plus-outline"
+      },
+      "subtract_time": {
+        "default": "mdi:clock-minus-outline"
+      }
+    }
+  },
+  "services": {
+    "add_time": "mdi:clock-plus-outline",
+    "subtract_time": "mdi:clock-minus-outline",
+    "add_maximum": "mdi:timer-plus-outline",
+    "subtract_maximum": "mdi:timer-minus-outline",
+    "add_maximum_random": "mdi:dice-plus-outline",
+    "subtract_maximum_random": "mdi:dice-minus-outline",
+    "add_minimum": "mdi:timer-plus-outline",
+    "subtract_minimum": "mdi:timer-minus-outline",
+    "add_minimum_random": "mdi:dice-plus-outline",
+    "subtract_minimum_random": "mdi:dice-minus-outline",
+    "add_requirements": "mdi:link-plus",
+    "subtract_requirements": "mdi:link-minus",
+    "add_requirements_random": "mdi:link-plus",
+    "subtract_requirements_random": "mdi:link-minus"
+  }
+}

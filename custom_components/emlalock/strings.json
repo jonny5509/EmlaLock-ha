@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect EmlaLock",
+        "description": "Enter the EmlaLock User ID and API key. The optional Holder API key is used for documented holder-authorized subtract operations.",
+        "data": {
+          "user_id": "User ID",
+          "api_key": "API key",
+          "holder_api_key": "Holder API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The EmlaLock credentials were rejected.",
+      "cannot_connect": "Unable to connect to EmlaLock.",
+      "unknown": "An unexpected EmlaLock API error occurred."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "time_remaining": {"name": "Time remaining"},
+      "session": {"name": "Session"},
+      "requirement_links": {"name": "Requirement links"},
+      "maximum_duration": {"name": "Maximum duration"},
+      "minimum_duration": {"name": "Minimum duration"},
+      "time_passed": {"name": "Time passed"},
+      "start_date": {"name": "Start date"},
+      "end_date": {"name": "End date"}
+    },
+    "binary_sensor": {
+      "session_active": {"name": "Session active"}
+    }
+  }
+}
