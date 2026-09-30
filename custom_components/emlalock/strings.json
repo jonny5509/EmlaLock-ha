@@ -21,15 +21,28 @@
     "sensor": {
       "time_remaining": {"name": "Time remaining"},
       "session": {"name": "Session"},
+      "username": {"name": "Username"},
+      "session_id": {"name": "Session ID"},
+      "holder_id": {"name": "Holder ID"},
+      "session_type": {"name": "Session type"},
       "requirement_links": {"name": "Requirement links"},
+      "duration": {"name": "Duration"},
+      "starting_duration": {"name": "Starting duration"},
       "maximum_duration": {"name": "Maximum duration"},
       "minimum_duration": {"name": "Minimum duration"},
       "time_passed": {"name": "Time passed"},
       "start_date": {"name": "Start date"},
-      "end_date": {"name": "End date"}
+      "end_date": {"name": "End date"},
+      "last_verification": {"name": "Last verification"},
+      "cleaning_started": {"name": "Cleaning started"},
+      "close_date": {"name": "Close date"},
+      "end_type": {"name": "End type"}
     },
     "binary_sensor": {
-      "session_active": {"name": "Session active"}
+      "session_active": {"name": "Session active"},
+      "in_cleaning": {"name": "In cleaning"},
+      "can_be_closed": {"name": "Can be closed"},
+      "has_holder": {"name": "Has holder"}
     }
   }
 }
