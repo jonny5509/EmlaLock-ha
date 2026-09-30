@@ -90,6 +90,42 @@ class EmlaLockSession(EmlaLockBase, SensorEntity):
         return "active" if _session(self.coordinator).get("status") else "inactive"
 
 
+class EmlaLockUsername(EmlaLockBase, SensorEntity):
+    _attr_name = "Username"
+    _attr_translation_key = "username"
+
+    @property
+    def native_value(self):
+        return _user(self.coordinator).get("username")
+
+
+class EmlaLockSessionId(EmlaLockBase, SensorEntity):
+    _attr_name = "Session ID"
+    _attr_translation_key = "session_id"
+
+    @property
+    def native_value(self):
+        return _session(self.coordinator).get("chastitysessionid")
+
+
+class EmlaLockHolderId(EmlaLockBase, SensorEntity):
+    _attr_name = "Holder ID"
+    _attr_translation_key = "holder_id"
+
+    @property
+    def native_value(self):
+        return _session(self.coordinator).get("holderid")
+
+
+class EmlaLockSessionType(EmlaLockBase, SensorEntity):
+    _attr_name = "Session type"
+    _attr_translation_key = "session_type"
+
+    @property
+    def native_value(self):
+        return _session(self.coordinator).get("sessiontype")
+
+
 class EmlaLockStartDate(EmlaLockBase, SensorEntity):
     _attr_name = "Start date"
     _attr_translation_key = "start_date"
@@ -195,6 +231,28 @@ class EmlaLockTimeRemaining(EmlaLockBase, SensorEntity):
         self.async_write_ha_state()
 
 
+class EmlaLockDuration(EmlaLockBase, SensorEntity):
+    _attr_name = "Duration"
+    _attr_translation_key = "duration"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self):
+        return _duration_seconds(_session(self.coordinator).get("duration"))
+
+
+class EmlaLockStartingDuration(EmlaLockBase, SensorEntity):
+    _attr_name = "Starting duration"
+    _attr_translation_key = "starting_duration"
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self):
+        return _duration_seconds(_session(self.coordinator).get("startduration"))
+
+
 class EmlaLockMaximum(EmlaLockBase, SensorEntity):
     _attr_name = "Maximum duration"
     _attr_translation_key = "maximum_duration"
@@ -203,7 +261,7 @@ class EmlaLockMaximum(EmlaLockBase, SensorEntity):
 
     @property
     def native_value(self):
-        return _duration_seconds(_session(self.coordinator).get("maxduration")) or 0.0
+        return _duration_seconds(_session(self.coordinator).get("maxduration"))
 
 
 class EmlaLockMinimum(EmlaLockBase, SensorEntity):
@@ -214,7 +272,7 @@ class EmlaLockMinimum(EmlaLockBase, SensorEntity):
 
     @property
     def native_value(self):
-        return _duration_seconds(_session(self.coordinator).get("minduration")) or 0.0
+        return _duration_seconds(_session(self.coordinator).get("minduration"))
 
 
 class EmlaLockRequirementLinks(EmlaLockBase, SensorEntity):
@@ -232,6 +290,45 @@ class EmlaLockRequirementLinks(EmlaLockBase, SensorEntity):
             return 0
 
 
+class EmlaLockLastVerification(EmlaLockBase, SensorEntity):
+    _attr_name = "Last verification"
+    _attr_translation_key = "last_verification"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self):
+        return _datetime_value(_session(self.coordinator).get("lastverification"))
+
+
+class EmlaLockCleaningStarted(EmlaLockBase, SensorEntity):
+    _attr_name = "Cleaning started"
+    _attr_translation_key = "cleaning_started"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self):
+        return _datetime_value(_session(self.coordinator).get("cleaningstarted"))
+
+
+class EmlaLockCloseDate(EmlaLockBase, SensorEntity):
+    _attr_name = "Close date"
+    _attr_translation_key = "close_date"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    @property
+    def native_value(self):
+        return _datetime_value(_session(self.coordinator).get("closedate"))
+
+
+class EmlaLockEndType(EmlaLockBase, SensorEntity):
+    _attr_name = "End type"
+    _attr_translation_key = "end_type"
+
+    @property
+    def native_value(self):
+        return _session(self.coordinator).get("endtype")
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
@@ -242,12 +339,22 @@ async def async_setup_entry(
     async_add_entities(
         [
             EmlaLockSession(coordinator, user_id, "session"),
+            EmlaLockUsername(coordinator, user_id, "username"),
+            EmlaLockSessionId(coordinator, user_id, "session_id"),
+            EmlaLockHolderId(coordinator, user_id, "holder_id"),
+            EmlaLockSessionType(coordinator, user_id, "session_type"),
             EmlaLockStartDate(coordinator, user_id, "start_date"),
             EmlaLockTimeInLock(coordinator, user_id, "time_passed"),
             EmlaLockEndDate(coordinator, user_id, "end_date"),
             EmlaLockTimeRemaining(coordinator, user_id, "remaining"),
+            EmlaLockDuration(coordinator, user_id, "duration"),
+            EmlaLockStartingDuration(coordinator, user_id, "starting_duration"),
             EmlaLockMaximum(coordinator, user_id, "maximum"),
             EmlaLockMinimum(coordinator, user_id, "minimum"),
             EmlaLockRequirementLinks(coordinator, user_id, "requirements"),
+            EmlaLockLastVerification(coordinator, user_id, "last_verification"),
+            EmlaLockCleaningStarted(coordinator, user_id, "cleaning_started"),
+            EmlaLockCloseDate(coordinator, user_id, "close_date"),
+            EmlaLockEndType(coordinator, user_id, "end_type"),
         ]
     )
