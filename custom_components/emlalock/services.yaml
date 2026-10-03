@@ -1,0 +1,328 @@
+add_time:
+  name: Add time
+  description: Add time to the EmlaLock timer.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Home Assistant config entry ID for the EmlaLock lock.
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      description: Time in seconds or an EmlaLock short-term value such as W1, D1, H1, M1, or S30.
+      required: true
+      selector:
+        text:
+    text:
+      name: Text
+      description: Optional display text sent with the add action.
+      required: false
+      selector:
+        text:
+
+subtract_time:
+  name: Subtract time
+  description: Subtract time from the EmlaLock timer.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        text:
+    text:
+      name: Text
+      required: false
+      selector:
+        text:
+
+add_maximum:
+  name: Add maximum
+  description: Add to the EmlaLock maximum value.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_maximum:
+  name: Subtract maximum
+  description: Subtract from the EmlaLock maximum value.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+add_minimum:
+  name: Add minimum
+  description: Add to the EmlaLock minimum value.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_minimum:
+  name: Subtract minimum
+  description: Subtract from the EmlaLock minimum value.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+add_requirements:
+  name: Add requirements
+  description: Add requirements to the EmlaLock lock.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_requirements:
+  name: Subtract requirements
+  description: Subtract requirements from the EmlaLock lock.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+add_time_random:
+  name: Add random time
+  description: Add a random amount of time between two values.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        text:
+    to_value:
+      name: To
+      required: true
+      selector:
+        text:
+
+subtract_time_random:
+  name: Subtract random time
+  description: Subtract a random amount of time between two values.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        text:
+    to_value:
+      name: To
+      required: true
+      selector:
+        text:
+
+add_maximum_random:
+  name: Add random maximum
+  description: Add a random amount to the EmlaLock maximum.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_maximum_random:
+  name: Subtract random maximum
+  description: Subtract a random amount from the EmlaLock maximum.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+add_minimum_random:
+  name: Add random minimum
+  description: Add a random amount to the EmlaLock minimum.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_minimum_random:
+  name: Subtract random minimum
+  description: Subtract a random amount from the EmlaLock minimum.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+add_requirements_random:
+  name: Add random requirements
+  description: Add a random number of requirements between two values.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+
+subtract_requirements_random:
+  name: Subtract random requirements
+  description: Subtract a random number of requirements between two values.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: true
+      selector:
+        text:
+    from_value:
+      name: From
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    to_value:
+      name: To
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
