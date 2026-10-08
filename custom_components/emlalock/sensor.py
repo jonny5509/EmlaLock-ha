@@ -7,7 +7,6 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
@@ -16,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_USER_ID, DOMAIN
 from .coordinator import EmlaLockCoordinator
+from .runtime_data import EmlaLockConfigEntry
 
 
 def _session(coordinator):
@@ -235,9 +235,7 @@ class EmlaLockRequirementLinks(EmlaLockBase, SensorEntity):
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
-    coordinator: EmlaLockCoordinator = hass.data[DOMAIN]["entries"][entry.entry_id][
-        "coordinator"
-    ]
+    coordinator: EmlaLockCoordinator = entry.runtime_data.coordinator
     user_id = entry.data[CONF_USER_ID]
     async_add_entities(
         [
