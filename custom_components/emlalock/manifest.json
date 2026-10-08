@@ -7,6 +7,7 @@
   "documentation": "https://github.com/jonny5509/EmlaLock-ha",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jonny5509/EmlaLock-ha/issues",
   "requirements": [],
   "version": "1.1.8"
 }
