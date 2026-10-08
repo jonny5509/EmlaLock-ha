@@ -9,6 +9,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .api import EmlaLockApi, EmlaLockApiError
@@ -94,7 +95,7 @@ async def async_setup(hass: HomeAssistant, config):
         async def run_action(call: ServiceCall, endpoint: str, random: bool = False):
             entry = hass.data[DOMAIN]["entries"].get(call.data["entry_id"])
             if not entry:
-                raise vol.Invalid("Unknown EmlaLock entry")
+                raise HomeAssistantError("Unknown EmlaLock entry")
 
             try:
                 if random:
@@ -110,7 +111,7 @@ async def async_setup(hass: HomeAssistant, config):
                 await entry["action_api"].action(endpoint, **params)
                 await entry["coordinator"].async_request_refresh()
             except EmlaLockApiError as err:
-                raise vol.Invalid(str(err)) from err
+                raise HomeAssistantError(str(err)) from err
 
         service_schemas = {
             "add_time": ("add", False, SERVICE_SCHEMA),
@@ -174,4 +175,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data[DOMAIN]["entries"].pop(entry.entry_id, None)
+    if unload_ok and not hass.data[DOMAIN]["entries"]:
+        for service_name in (
+        "add_time", "subtract_time",
+        "add_maximum", "subtract_maximum",
+        "add_minimum", "subtract_minimum",
+        "add_requirements", "subtract_requirements",
+        "add_time_random", "subtract_time_random",
+        "add_maximum_random", "subtract_maximum_random",
+        "add_minimum_random", "subtract_minimum_random",
+        "add_requirements_random", "subtract_requirements_random",
+        ):
+            if hass.services.has_service(DOMAIN, service_name):
+                hass.services.async_remove(DOMAIN, service_name)
+        hass.data[DOMAIN]["services_registered"] = False
     return unload_ok
