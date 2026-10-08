@@ -37,8 +37,6 @@ rules:
     status: done
   integration-owner:
     status: done
-  log-when-unavailable:
-    status: done
   reauthentication-flow:
     status: done
   diagnostics:
