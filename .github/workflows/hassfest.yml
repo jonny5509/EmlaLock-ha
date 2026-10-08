@@ -1,0 +1,19 @@
+name: Validate Home Assistant integration
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
