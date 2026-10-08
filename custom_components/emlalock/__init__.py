@@ -7,7 +7,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -104,8 +104,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         call: ServiceCall, endpoint: str, random: bool = False
     ) -> None:
         entry = hass.config_entries.async_get_entry(call.data["entry_id"])
-        if entry is None or not entry.state_recoverable:
-            raise HomeAssistantError("The EmlaLock config entry is not available")
+        if entry is None or entry.state is not ConfigEntryState.LOADED:
+            raise HomeAssistantError("The EmlaLock config entry is not loaded")
 
         runtime_data = entry.runtime_data
         if not isinstance(runtime_data, EmlaLockRuntimeData):
