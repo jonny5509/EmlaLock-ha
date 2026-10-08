@@ -1,0 +1,67 @@
+add_time:
+  name: Add time
+  description: Add time to the active EmlaLock session.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: EmlaLock config entry ID.
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      description: Seconds or EmlaLock short-term value.
+      required: true
+      selector:
+        text:
+    text:
+      name: Text
+      description: Optional text for the time adjustment.
+      required: false
+      selector:
+        text:
+subtract_time:
+  name: Subtract time
+  description: Subtract time from the active EmlaLock session.
+add_maximum:
+  name: Add maximum
+  description: Add to the session maximum.
+add_maximum_random:
+  name: Add maximum randomly
+  description: Add a random amount to the session maximum.
+add_minimum:
+  name: Add minimum
+  description: Add to the session minimum.
+add_minimum_random:
+  name: Add minimum randomly
+  description: Add a random amount to the session minimum.
+subtract_maximum:
+  name: Subtract maximum
+  description: Subtract from the session maximum.
+subtract_maximum_random:
+  name: Subtract maximum randomly
+  description: Subtract a random amount from the session maximum.
+subtract_minimum:
+  name: Subtract minimum
+  description: Subtract from the session minimum.
+subtract_minimum_random:
+  name: Subtract minimum randomly
+  description: Subtract a random amount from the session minimum.
+add_requirements:
+  name: Add requirements
+  description: Add requirements to the active session.
+subtract_requirements:
+  name: Subtract requirements
+  description: Subtract requirements from the active session.
+add_time_random:
+  name: Add time randomly
+  description: Add a random amount of time.
+subtract_time_random:
+  name: Subtract time randomly
+  description: Subtract a random amount of time.
+add_requirements_random:
+  name: Add requirements randomly
+  description: Add a random number of requirements.
+subtract_requirements_random:
+  name: Subtract requirements randomly
+  description: Subtract a random number of requirements.
