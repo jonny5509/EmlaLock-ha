@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -10,6 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import EmlaLockApiError
 from .const import DOMAIN
 from .coordinator import EmlaLockCoordinator
+from .runtime_data import EmlaLockConfigEntry
 
 
 class EmlaLockRefreshButton(CoordinatorEntity[EmlaLockCoordinator], ButtonEntity):
@@ -81,11 +81,9 @@ class EmlaLockActionButton(CoordinatorEntity[EmlaLockCoordinator], ButtonEntity)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: EmlaLockConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: EmlaLockCoordinator = hass.data[DOMAIN]["entries"][entry.entry_id][
-        "coordinator"
-    ]
+    coordinator: EmlaLockCoordinator = entry.runtime_data.coordinator
     user_id = entry.data["user_id"]
 
     entities = [EmlaLockRefreshButton(coordinator, user_id)]
