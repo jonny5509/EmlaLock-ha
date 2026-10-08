@@ -39,10 +39,8 @@ def _history(payload: dict[str, Any]) -> Any:
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    data = hass.data.get(DOMAIN, {})
-    entry_data = data.get("entries", {}).get(entry.entry_id, {})
-    coordinator = entry_data.get("coordinator")
-    payload = coordinator.data if coordinator and isinstance(coordinator.data, dict) else {}
+    coordinator = entry.runtime_data.coordinator
+    payload = coordinator.data if isinstance(coordinator.data, dict) else {}
     session = payload.get("chastitysession") or {}
     return {
         "account": _account(payload.get("user")),
