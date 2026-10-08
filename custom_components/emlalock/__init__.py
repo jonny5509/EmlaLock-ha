@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
 import voluptuous as vol
 from homeassistant.components import frontend
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -15,6 +15,8 @@ from homeassistant.helpers import config_validation as cv
 from .api import EmlaLockApi, EmlaLockApiError
 from .const import CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN
 from .coordinator import EmlaLockCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
@@ -80,16 +82,19 @@ TIME_ENDPOINTS_WITH_TEXT = {"add", "sub"}
 
 
 async def async_setup(hass: HomeAssistant, config):
+    """Set up EmlaLock without making frontend support a startup requirement."""
     hass.data.setdefault(DOMAIN, {"entries": {}, "services_registered": False})
 
-    # Make the bundled Lovelace card available automatically. The card lives
-    # inside the installed integration package, so HACS installs it together
-    # with EmlaLock and users do not need a separate dashboard resource.
     if _CARD_FILE.is_file():
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(_CARD_URL, str(_CARD_FILE), cache_headers=False)]
-        )
-        frontend.add_extra_js_url(hass, _CARD_URL)
+        try:
+            from homeassistant.components.http import StaticPathConfig
+
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig(_CARD_URL, str(_CARD_FILE), cache_headers=False)]
+            )
+            frontend.add_extra_js_url(hass, _CARD_URL)
+        except (ImportError, AttributeError, KeyError) as err:
+            _LOGGER.warning("Unable to register the EmlaLock Lovelace card: %s", err)
 
     if not hass.data[DOMAIN]["services_registered"]:
 
@@ -155,6 +160,7 @@ async def async_setup(hass: HomeAssistant, config):
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up a config entry."""
     data = entry.data
     action_api = EmlaLockApi(
         hass,
@@ -174,18 +180,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data[DOMAIN]["entries"].pop(entry.entry_id, None)
     if unload_ok and not hass.data[DOMAIN]["entries"]:
         for service_name in (
-        "add_time", "subtract_time",
-        "add_maximum", "subtract_maximum",
-        "add_minimum", "subtract_minimum",
-        "add_requirements", "subtract_requirements",
-        "add_time_random", "subtract_time_random",
-        "add_maximum_random", "subtract_maximum_random",
-        "add_minimum_random", "subtract_minimum_random",
-        "add_requirements_random", "subtract_requirements_random",
+            "add_time", "subtract_time",
+            "add_maximum", "subtract_maximum",
+            "add_minimum", "subtract_minimum",
+            "add_requirements", "subtract_requirements",
+            "add_time_random", "subtract_time_random",
+            "add_maximum_random", "subtract_maximum_random",
+            "add_minimum_random", "subtract_minimum_random",
+            "add_requirements_random", "subtract_requirements_random",
         ):
             if hass.services.has_service(DOMAIN, service_name):
                 hass.services.async_remove(DOMAIN, service_name)
