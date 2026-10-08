@@ -1,13 +1,12 @@
 {
   "domain": "emlalock",
   "name": "EmlaLock",
-  "codeowners": [
-    "@jonny5509"
-  ],
+  "codeowners": ["@jonny5509"],
   "config_flow": true,
   "documentation": "https://github.com/jonny5509/EmlaLock-ha",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "requirements": [],
-  "version": "1.1.2"
+  "single_config_entry": true,
+  "version": "1.2.0"
 }
