@@ -10,7 +10,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
 from .api import EmlaLockApi, EmlaLockApiError
@@ -105,7 +105,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     ) -> None:
         entry = hass.config_entries.async_get_entry(call.data["entry_id"])
         if entry is None or entry.state is not ConfigEntryState.LOADED:
-            raise HomeAssistantError("The EmlaLock config entry is not loaded")
+            raise ServiceValidationError("The EmlaLock config entry is not loaded")
 
         runtime_data = entry.runtime_data
         if not isinstance(runtime_data, EmlaLockRuntimeData):
