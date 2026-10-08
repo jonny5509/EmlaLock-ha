@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from homeassistant.config_entries import ConfigEntry
+
 from .api import EmlaLockApi
 from .coordinator import EmlaLockCoordinator
-from homeassistant.config_entries import ConfigEntry
 
 
 @dataclass(slots=True)
