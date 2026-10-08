@@ -201,7 +201,7 @@ class EmlaLockCard extends HTMLElement {
   }
 }
 
-customElements.define("emlalock-card", EmlaLockCard);
+if (!customElements.get("emlalock-card")) {\n  customElements.define("emlalock-card", EmlaLockCard);\n}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
