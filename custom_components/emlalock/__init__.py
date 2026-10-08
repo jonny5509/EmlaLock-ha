@@ -55,6 +55,8 @@ def _time_value(value: Any) -> int | str:
 
 TIME_VALUE = _time_value
 
+CONFIG_SCHEMA = cv.empty_config_schema()
+
 SERVICE_SCHEMA = vol.Schema(
     {
         vol.Required("entry_id"): cv.string,
