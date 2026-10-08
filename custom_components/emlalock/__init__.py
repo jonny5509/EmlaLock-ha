@@ -17,6 +17,7 @@ from .const import CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN
 from .coordinator import EmlaLockCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 _CARD_URL = "/emlalock/emlalock-card.js"
 _CARD_FILE = Path(__file__).resolve().parent / "www" / "emlalock-card.js"
