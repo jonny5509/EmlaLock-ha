@@ -25,6 +25,7 @@ _CARD_URL = "/emlalock/emlalock-card.js"
 _CARD_FILE = Path(__file__).resolve().parent / "www" / "emlalock-card.js"
 
 _SHORT_TIME_RE = re.compile(r"^(?:W\d+|D\d+|H\d+|M\d+|S\d+)+$", re.IGNORECASE)
+TIME_ENDPOINTS_WITH_TEXT = {"add", "sub"}
 
 
 def _time_value(value):
@@ -47,42 +48,63 @@ def _time_value(value):
 
 TIME_VALUE = _time_value
 
-SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required("entry_id"): cv.string,
-        vol.Required("value"): TIME_VALUE,
-        vol.Optional("text", default=""): vol.All(cv.string, vol.Length(max=49)),
-    }
-)
 
-REQUIREMENT_SCHEMA = vol.Schema(
-    {
-        vol.Required("entry_id"): cv.string,
-        vol.Required("value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
-    }
-)
+def _build_service_schemas():
+    """Build service schemas only after Home Assistant has loaded the integration."""
+    service_schema = vol.Schema(
+        {
+            vol.Required("entry_id"): cv.string,
+            vol.Required("value"): TIME_VALUE,
+            vol.Optional("text", default=""): vol.All(cv.string, vol.Length(max=49)),
+        }
+    )
+    requirement_schema = vol.Schema(
+        {
+            vol.Required("entry_id"): cv.string,
+            vol.Required("value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+        }
+    )
+    time_random_schema = vol.Schema(
+        {
+            vol.Required("entry_id"): cv.string,
+            vol.Required("from_value"): TIME_VALUE,
+            vol.Required("to_value"): TIME_VALUE,
+        }
+    )
+    requirement_random_schema = vol.Schema(
+        {
+            vol.Required("entry_id"): cv.string,
+            vol.Required("from_value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Required("to_value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+        }
+    )
 
-TIME_RANDOM_SCHEMA = vol.Schema(
-    {
-        vol.Required("entry_id"): cv.string,
-        vol.Required("from_value"): TIME_VALUE,
-        vol.Required("to_value"): TIME_VALUE,
-    }
-)
-
-REQUIREMENT_RANDOM_SCHEMA = vol.Schema(
-    {
-        vol.Required("entry_id"): cv.string,
-        vol.Required("from_value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
-        vol.Required("to_value"): vol.All(vol.Coerce(int), vol.Range(min=0)),
-    }
-)
-
-TIME_ENDPOINTS_WITH_TEXT = {"add", "sub"}
+    return (
+        {
+            "add_time": ("add", service_schema),
+            "subtract_time": ("sub", service_schema),
+            "add_maximum": ("addmaximum", service_schema),
+            "subtract_maximum": ("submaximum", service_schema),
+            "add_minimum": ("addminimum", service_schema),
+            "subtract_minimum": ("subminimum", service_schema),
+            "add_requirements": ("addrequirement", requirement_schema),
+            "subtract_requirements": ("subrequirement", requirement_schema),
+        },
+        {
+            "add_time_random": ("addrandom", time_random_schema),
+            "subtract_time_random": ("subrandom", time_random_schema),
+            "add_maximum_random": ("addmaximumrandom", time_random_schema),
+            "subtract_maximum_random": ("submaximumrandom", time_random_schema),
+            "add_minimum_random": ("addminimumrandom", time_random_schema),
+            "subtract_minimum_random": ("subminimumrandom", time_random_schema),
+            "add_requirements_random": ("addrequirementrandom", requirement_random_schema),
+            "subtract_requirements_random": ("subrequirementrandom", requirement_random_schema),
+        },
+    )
 
 
 async def async_setup(hass: HomeAssistant, config):
-    """Set up EmlaLock without making frontend support a startup requirement."""
+    """Set up EmlaLock."""
     hass.data.setdefault(DOMAIN, {"entries": {}, "services_registered": False})
 
     if _CARD_FILE.is_file():
@@ -97,6 +119,7 @@ async def async_setup(hass: HomeAssistant, config):
             _LOGGER.warning("Unable to register the EmlaLock Lovelace card: %s", err)
 
     if not hass.data[DOMAIN]["services_registered"]:
+        service_schemas, random_schemas = _build_service_schemas()
 
         async def run_action(call: ServiceCall, endpoint: str, random: bool = False):
             entry = hass.data[DOMAIN]["entries"].get(call.data["entry_id"])
@@ -105,10 +128,7 @@ async def async_setup(hass: HomeAssistant, config):
 
             try:
                 if random:
-                    params = {
-                        "from": call.data["from_value"],
-                        "to": call.data["to_value"],
-                    }
+                    params = {"from": call.data["from_value"], "to": call.data["to_value"]}
                 else:
                     params = {"value": call.data["value"]}
                     if endpoint in TIME_ENDPOINTS_WITH_TEXT and call.data.get("text"):
@@ -119,34 +139,12 @@ async def async_setup(hass: HomeAssistant, config):
             except EmlaLockApiError as err:
                 raise HomeAssistantError(str(err)) from err
 
-        service_schemas = {
-            "add_time": ("add", False, SERVICE_SCHEMA),
-            "subtract_time": ("sub", False, SERVICE_SCHEMA),
-            "add_maximum": ("addmaximum", False, SERVICE_SCHEMA),
-            "subtract_maximum": ("submaximum", False, SERVICE_SCHEMA),
-            "add_minimum": ("addminimum", False, SERVICE_SCHEMA),
-            "subtract_minimum": ("subminimum", False, SERVICE_SCHEMA),
-            "add_requirements": ("addrequirement", False, REQUIREMENT_SCHEMA),
-            "subtract_requirements": ("subrequirement", False, REQUIREMENT_SCHEMA),
-        }
+        for service_name, (endpoint, schema) in service_schemas.items():
 
-        for service_name, (endpoint, random, schema) in service_schemas.items():
-
-            async def handler(call, ep=endpoint, is_random=random):
-                await run_action(call, ep, is_random)
+            async def handler(call, ep=endpoint):
+                await run_action(call, ep)
 
             hass.services.async_register(DOMAIN, service_name, handler, schema=schema)
-
-        random_schemas = {
-            "add_time_random": ("addrandom", TIME_RANDOM_SCHEMA),
-            "subtract_time_random": ("subrandom", TIME_RANDOM_SCHEMA),
-            "add_maximum_random": ("addmaximumrandom", TIME_RANDOM_SCHEMA),
-            "subtract_maximum_random": ("submaximumrandom", TIME_RANDOM_SCHEMA),
-            "add_minimum_random": ("addminimumrandom", TIME_RANDOM_SCHEMA),
-            "subtract_minimum_random": ("subminimumrandom", TIME_RANDOM_SCHEMA),
-            "add_requirements_random": ("addrequirementrandom", REQUIREMENT_RANDOM_SCHEMA),
-            "subtract_requirements_random": ("subrequirementrandom", REQUIREMENT_RANDOM_SCHEMA),
-        }
 
         for service_name, (endpoint, schema) in random_schemas.items():
 
