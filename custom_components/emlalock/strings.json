@@ -17,19 +17,63 @@
       "unknown": "An unexpected EmlaLock API error occurred."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "EmlaLock notification settings",
+        "description": "Choose where and when you want notifications. All notification options are off by default.",
+        "data": {
+          "enable_phone_notifications": "Enable phone notifications",
+          "notification_service": "Phone to notify",
+          "notify_daily": "Phone: notify every 24 hours",
+          "notify_completion": "Phone: notify when session ends",
+          "enable_ha_notifications": "Enable Home Assistant notifications",
+          "notify_ha_daily": "Home Assistant: notify every 24 hours",
+          "notify_ha_completion": "Home Assistant: notify when session ends"
+        },
+        "data_description": {
+          "enable_phone_notifications": "Sends push notifications to your selected Home Assistant mobile app.",
+          "notification_service": "Choose the notify service for the phone that should receive alerts.",
+          "notify_daily": "Send a phone push notification every 24 hours during a session.",
+          "notify_completion": "Send a phone push notification when a session ends.",
+          "enable_ha_notifications": "Creates persistent notifications inside Home Assistant.",
+          "notify_ha_daily": "Create a Home Assistant notification every 24 hours during a session.",
+          "notify_ha_completion": "Create a Home Assistant notification when a session ends."
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
-      "time_remaining": {"name": "Time remaining"},
-      "session": {"name": "Session"},
-      "requirement_links": {"name": "Requirement links"},
-      "maximum_duration": {"name": "Maximum duration"},
-      "minimum_duration": {"name": "Minimum duration"},
-      "time_passed": {"name": "Time passed"},
-      "start_date": {"name": "Start date"},
-      "end_date": {"name": "End date"}
+      "time_remaining": {
+        "name": "Time remaining"
+      },
+      "session": {
+        "name": "Session"
+      },
+      "requirement_links": {
+        "name": "Requirement links"
+      },
+      "maximum_duration": {
+        "name": "Maximum duration"
+      },
+      "minimum_duration": {
+        "name": "Minimum duration"
+      },
+      "time_passed": {
+        "name": "Time passed"
+      },
+      "start_date": {
+        "name": "Start date"
+      },
+      "end_date": {
+        "name": "End date"
+      }
     },
     "binary_sensor": {
-      "session_active": {"name": "Session active"}
+      "session_active": {
+        "name": "Session active"
+      }
     }
   }
 }
