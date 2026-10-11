@@ -122,7 +122,7 @@ async def async_setup(hass: HomeAssistant, config):
         message = "This is a test notification. Your EmlaLock notification delivery is configured."
         if mobile:
             service = str(options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
-            if not re.fullmatch(r"notify\\.[a-z0-9_]+", service):
+            if not re.fullmatch(r"notify\.[a-z0-9_]+", service):
                 raise HomeAssistantError("Select a valid mobile notification service in EmlaLock options")
             await hass.services.async_call("notify", service.split(".", 1)[1], {"title": title, "message": message}, blocking=True)
         if persistent:
