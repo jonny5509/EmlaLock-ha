@@ -18,7 +18,7 @@ from .coordinator import EmlaLockCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.CALENDAR]
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 _CARD_URL = "/emlalock/emlalock-card.js"

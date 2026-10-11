@@ -13,6 +13,7 @@ A Home Assistant custom integration for **EmlaLock**, including a bundled Lovela
 - 📊 Session status and timing information
 - 🟢 Active/inactive session state
 - 📅 Start and end dates
+- 🗓️ Session calendar entity for viewing the current session in Home Assistant calendars
 - ⏱️ Elapsed and remaining time
 - ⏳ Minimum and maximum duration
 - 🔗 Requirement links
