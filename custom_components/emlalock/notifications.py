@@ -18,6 +18,8 @@ from .const import (
     CONF_NOTIFICATION_SERVICE,
     CONF_NOTIFY_DAILY,
     CONF_NOTIFY_COMPLETION,
+    CONF_NOTIFY_HA_DAILY,
+    CONF_NOTIFY_HA_COMPLETION,
     DEFAULT_NOTIFICATION_SERVICE,
     DOMAIN,
 )
@@ -70,15 +72,30 @@ class EmlaLockSessionNotifications:
     async def _tick(self, _now: datetime) -> None:
         await self.async_check()
 
-    async def _notify(self, title: str, message: str) -> bool:
-        try:
-            await self.hass.services.async_call(
-                "notify", self.service, {"title": title, "message": message}, blocking=True
-            )
-            return True
-        except Exception:
-            _LOGGER.exception("Unable to send emlalock notification through notify.%s", self.service)
-            return False
+    async def _notify(self, title: str, message: str, event: str) -> bool:
+        """Send to the selected mobile service and/or Home Assistant."""
+        mobile_key = CONF_NOTIFY_DAILY if event == "daily" else CONF_NOTIFY_COMPLETION
+        ha_key = CONF_NOTIFY_HA_DAILY if event == "daily" else CONF_NOTIFY_HA_COMPLETION
+        delivered = False
+        if self.entry.options.get(mobile_key, False):
+            try:
+                await self.hass.services.async_call(
+                    "notify", self.service, {"title": title, "message": message}, blocking=True
+                )
+                delivered = True
+            except Exception:
+                _LOGGER.exception("Unable to send EmlaLock mobile notification through notify.%s", self.service)
+        if self.entry.options.get(ha_key, False):
+            try:
+                await self.hass.services.async_call(
+                    "persistent_notification", "create",
+                    {"title": title, "message": message, "notification_id": f"{DOMAIN}_{self.entry.entry_id}_{event}"},
+                    blocking=True,
+                )
+                delivered = True
+            except Exception:
+                _LOGGER.exception("Unable to create EmlaLock Home Assistant notification")
+        return delivered
 
     async def async_check(self) -> None:
         data = self.coordinator.data
@@ -104,13 +121,13 @@ class EmlaLockSessionNotifications:
                 self.state.update({"start": start, "last_daily_day": 0, "completion_notified": False})
                 changed = True
             elapsed_days = int(max(0, now - start) // 86400)
-            if self.entry.options.get(CONF_NOTIFY_DAILY, False) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
-                if await self._notify("emlalock 24-hour reminder", f"{name}: {elapsed_days} day(s) since the session started."):
+            if (self.entry.options.get(CONF_NOTIFY_DAILY, False) or self.entry.options.get(CONF_NOTIFY_HA_DAILY, False)) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
+                if await self._notify("emlalock 24-hour reminder", f"{name}: {elapsed_days} day(s) since the session started.", "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
-            if self.entry.options.get(CONF_NOTIFY_COMPLETION, False):
-                if await self._notify("emlalock session ended", f"{name} has ended."):
+            if self.entry.options.get(CONF_NOTIFY_COMPLETION, False) or self.entry.options.get(CONF_NOTIFY_HA_COMPLETION, False):
+                if await self._notify("emlalock session ended", f"{name} has ended.", "completion"):
                     self.state["completion_notified"] = True
                     changed = True
             else:

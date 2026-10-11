@@ -16,3 +16,6 @@ CONF_NOTIFICATION_SERVICE = "notification_service"
 CONF_NOTIFY_DAILY = "notify_daily"
 CONF_NOTIFY_COMPLETION = "notify_completion"
 DEFAULT_NOTIFICATION_SERVICE = "notify.notify"
+
+CONF_NOTIFY_HA_DAILY = "notify_ha_daily"
+CONF_NOTIFY_HA_COMPLETION = "notify_ha_completion"
