@@ -3,13 +3,23 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY
+from homeassistant.core import callback
 
 from .api import EmlaLockApi, EmlaLockApiError
-from .const import (\n    CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_ENABLE_NOTIFICATIONS,\n    CONF_NOTIFICATION_SERVICE, CONF_NOTIFY_DAILY, CONF_NOTIFY_COMPLETION,\n    DEFAULT_NOTIFICATION_SERVICE,\n)
+from .const import (
+    CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_ENABLE_NOTIFICATIONS,
+    CONF_NOTIFICATION_SERVICE, CONF_NOTIFY_DAILY, CONF_NOTIFY_COMPLETION,
+    DEFAULT_NOTIFICATION_SERVICE,
+)
 
 
 class EmlaLockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 5\n\n    @staticmethod\n    @config_entries.callback\n    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:\n        return EmlaLockOptionsFlow()
+    VERSION = 5
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+        return EmlaLockOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         if self._async_current_entries():
