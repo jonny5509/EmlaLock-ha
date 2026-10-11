@@ -1,18 +1,21 @@
-"""Calendar entity for EmlaLock sessions."""
+"""Persistent calendar history for EmlaLock sessions."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_USER_ID, DOMAIN
 from .coordinator import EmlaLockCoordinator
+
+_STORAGE_VERSION = 1
 
 
 def _session(coordinator: EmlaLockCoordinator) -> dict[str, Any]:
@@ -23,26 +26,20 @@ def _session(coordinator: EmlaLockCoordinator) -> dict[str, Any]:
 
 
 def _datetime_value(value: Any) -> datetime | None:
-    """Parse EmlaLock Unix timestamps or ISO date strings into aware UTC datetimes."""
+    """Parse Unix timestamps or ISO date strings into aware UTC datetimes."""
     if value is None or value == "" or isinstance(value, bool):
         return None
-
     if isinstance(value, (int, float)):
         try:
             timestamp = float(value)
-            # Accommodate millisecond Unix timestamps as well as seconds.
             if abs(timestamp) >= 10_000_000_000:
                 timestamp /= 1000
             return datetime.fromtimestamp(timestamp, tz=timezone.utc)
         except (OverflowError, OSError, ValueError):
             return None
-
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not value.strip():
         return None
-
     text = value.strip()
-    if not text:
-        return None
     try:
         timestamp = float(text)
     except ValueError:
@@ -51,7 +48,6 @@ def _datetime_value(value: Any) -> datetime | None:
         except (TypeError, ValueError, OverflowError):
             return None
         return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
-
     try:
         if abs(timestamp) >= 10_000_000_000:
             timestamp /= 1000
@@ -60,31 +56,65 @@ def _datetime_value(value: Any) -> datetime | None:
         return None
 
 
+def _parse_saved(value: Any) -> datetime | None:
+    return _datetime_value(value)
+
+
 class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEntity):
-    """Expose the EmlaLock session start and end as a calendar event."""
+    """Expose current sessions and persist them after completion."""
 
     _attr_has_entity_name = True
     _attr_name = "EmlaLock Session Calendar"
     _attr_icon = "mdi:calendar-lock"
 
-    def __init__(self, coordinator: EmlaLockCoordinator, user_id: str) -> None:
+    def __init__(self, coordinator: EmlaLockCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"{user_id}_session_calendar"
+        self._attr_unique_id = f"{entry.data[CONF_USER_ID]}_session_calendar"
+        self._store: Store[dict[str, Any]] = Store(
+            coordinator.hass, _STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_calendar_history"
+        )
+        self._history: list[dict[str, Any]] = []
+        self._save_task: Any = None
 
-    @property
-    def event(self) -> CalendarEvent | None:
-        """Return the current session when its dates are available."""
+    async def async_added_to_hass(self) -> None:
+        saved = await self._store.async_load()
+        if isinstance(saved, dict) and isinstance(saved.get("events"), list):
+            self._history = [
+                item for item in saved["events"]
+                if isinstance(item, dict)
+                and isinstance(item.get("uid"), str)
+                and isinstance(item.get("start"), str)
+                and isinstance(item.get("end"), str)
+            ]
+        await super().async_added_to_hass()
+        self._record_current()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._save_task is not None:
+            await self._save_task
+        await super().async_will_remove_from_hass()
+
+    def _current_event(self) -> CalendarEvent | None:
         session = _session(self.coordinator)
         start = _datetime_value(session.get("startdate"))
         end = _datetime_value(session.get("enddate"))
         if start is None or end is None or end <= start:
             return None
-
-        user = (self.coordinator.data or {}).get("user", {})
+        data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
+        user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
         title = f"{username} - EmlaLock session" if username else "EmlaLock session"
-        status = "active" if session.get("status") else "inactive"
-        session_id = session.get("chastitysessionid", "unknown")
+        session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
+        status_value = session.get("status")
+        active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
+        now = datetime.now(timezone.utc)
+        # A scheduled end time is not proof that the session ended. Keep an
+        # active overdue session visible and refresh its calendar end forward.
+        if active and end <= now:
+            interval = getattr(self.coordinator, "update_interval", None)
+            seconds = interval.total_seconds() if isinstance(interval, timedelta) else 60
+            end = now + timedelta(seconds=max(60, seconds))
+        status = "active" if active else "inactive"
         return CalendarEvent(
             summary=title,
             start=start,
@@ -93,14 +123,87 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
             uid=f"emlalock-session-{session_id}",
         )
 
+    @property
+    def event(self) -> CalendarEvent | None:
+        return self._current_event()
+
+    def _queue_save(self) -> None:
+        snapshot = {"events": [dict(item) for item in self._history]}
+        previous = self._save_task
+
+        async def save() -> None:
+            if previous is not None:
+                try:
+                    await previous
+                except Exception:  # noqa: BLE001
+                    pass
+            await self._store.async_save(snapshot)
+
+        self._save_task = self.hass.async_create_task(save())
+
+    def _record_current(self) -> None:
+        event = self._current_event()
+        changed = False
+        active_records = [item for item in self._history if item.get("active")]
+        if event is not None:
+            start = event.start.astimezone(timezone.utc).isoformat()
+            end = event.end.astimezone(timezone.utc).isoformat()
+            for item in active_records:
+                if item.get("uid") != event.uid:
+                    item["active"] = False
+                    changed = True
+            record = next((item for item in self._history if item.get("uid") == event.uid), None)
+            serialized = {
+                "uid": str(event.uid), "summary": event.summary,
+                "description": event.description or "", "start": start, "end": end,
+                "active": True,
+            }
+            if record is None:
+                self._history.append(serialized)
+                changed = True
+            elif record != serialized:
+                record.update(serialized)
+                changed = True
+        else:
+            # No current session: close any previously active records, retaining
+            # their last known title, start, scheduled end and session details.
+            for item in active_records:
+                item["active"] = False
+                changed = True
+        if changed:
+            self._queue_save()
+
+    def _handle_coordinator_update(self) -> None:
+        self._record_current()
+        super()._handle_coordinator_update()
+
     async def async_get_events(
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
-        """Return the session if it overlaps the requested calendar range."""
-        event = self.event
-        if event is None or event.start >= end_date or event.end <= start_date:
-            return []
-        return [event]
+        current = self._current_event()
+        records = [dict(item) for item in self._history]
+        if current is not None:
+            records = [item for item in records if item.get("uid") != current.uid]
+            records.append({
+                "uid": str(current.uid), "summary": current.summary,
+                "description": current.description or "",
+                "start": current.start.astimezone(timezone.utc).isoformat(),
+                "end": current.end.astimezone(timezone.utc).isoformat(), "active": True,
+            })
+        start_bound = start_date.astimezone(timezone.utc) if start_date.tzinfo else start_date.replace(tzinfo=timezone.utc)
+        end_bound = end_date.astimezone(timezone.utc) if end_date.tzinfo else end_date.replace(tzinfo=timezone.utc)
+        events: list[CalendarEvent] = []
+        for item in records:
+            start = _parse_saved(item.get("start"))
+            end = _parse_saved(item.get("end"))
+            if start is None or end is None or end <= start or end <= start_bound or start >= end_bound:
+                continue
+            events.append(CalendarEvent(
+                summary=str(item.get("summary") or "EmlaLock session"),
+                start=start, end=end, description=str(item.get("description") or ""),
+                uid=str(item["uid"]),
+            ))
+        return sorted(events, key=lambda event: event.start)
 
 
 async def async_setup_entry(
@@ -109,7 +212,5 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the EmlaLock session calendar."""
-    coordinator: EmlaLockCoordinator = hass.data[DOMAIN]["entries"][entry.entry_id][
-        "coordinator"
-    ]
-    async_add_entities([EmlaLockSessionCalendar(coordinator, entry.data[CONF_USER_ID])])
+    coordinator: EmlaLockCoordinator = hass.data[DOMAIN]["entries"][entry.entry_id]["coordinator"]
+    async_add_entities([EmlaLockSessionCalendar(coordinator, entry)])
