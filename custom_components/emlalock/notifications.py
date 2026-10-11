@@ -53,10 +53,10 @@ class EmlaLockSessionNotifications:
         self.hass = hass
         self.entry = entry
         self.coordinator = coordinator
-        self.store = Store(hass, 1, f"${DOMAIN}_session_notifications_${entry.entry_id}")
+        self.store = Store(hass, 1, f"{DOMAIN}_session_notifications_{entry.entry_id}")
         self.state: dict[str, Any] = {}
         service = str(entry.options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
-        self.service = service.split(".", 1)[1] if re.fullmatch(r"notify\\.[a-z0-9_]+", service) else "notify"
+        self.service = service.split(".", 1)[1] if re.fullmatch(r"notify\.[a-z0-9_]+", service) else "notify"
 
     async def async_start(self) -> None:
         saved = await self.store.async_load()
@@ -87,7 +87,8 @@ class EmlaLockSessionNotifications:
         session = data.get("chastitysession") or {}
         if not isinstance(session, dict):
             session = {}
-        active = bool(bool(session.get("status")))
+        status = session.get("status")
+        active = status is True or (isinstance(status, (int, float)) and status != 0) or (isinstance(status, str) and status.strip().lower() in {"active", "locked", "true", "1"})
         start = _timestamp(session.get("startdate"))
         now = datetime.now(timezone.utc).timestamp()
         name = str((data.get("user") or {}).get("username") or "emlalock session")
