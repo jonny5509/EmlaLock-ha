@@ -3,13 +3,23 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY
+from homeassistant.core import callback
 
 from .api import EmlaLockApi, EmlaLockApiError
-from .const import CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN
+from .const import (
+    CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_ENABLE_NOTIFICATIONS,
+    CONF_NOTIFICATION_SERVICE, CONF_NOTIFY_DAILY, CONF_NOTIFY_COMPLETION,
+    DEFAULT_NOTIFICATION_SERVICE,
+)
 
 
 class EmlaLockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 5
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+        return EmlaLockOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         if self._async_current_entries():
@@ -83,4 +93,20 @@ class EmlaLockConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+class EmlaLockOptionsFlow(config_entries.OptionsFlow):
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+        options = self.config_entry.options
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_ENABLE_NOTIFICATIONS, default=options.get(CONF_ENABLE_NOTIFICATIONS, False)): bool,
+                vol.Optional(CONF_NOTIFICATION_SERVICE, default=options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE)): vol.All(str, vol.Match(r"^notify\.[a-z0-9_]+$")),
+                vol.Optional(CONF_NOTIFY_DAILY, default=options.get(CONF_NOTIFY_DAILY, False)): bool,
+                vol.Optional(CONF_NOTIFY_COMPLETION, default=options.get(CONF_NOTIFY_COMPLETION, False)): bool,
+            }),
         )

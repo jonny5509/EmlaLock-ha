@@ -14,6 +14,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .api import EmlaLockApi, EmlaLockApiError
 from .const import CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN
+from .notifications import async_setup_notifications
 from .coordinator import EmlaLockCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -157,6 +158,10 @@ async def async_setup(hass: HomeAssistant, config):
     return True
 
 
+async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a config entry."""
     data = entry.data
@@ -173,6 +178,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
         "action_api": action_api,
     }
+    entry.async_on_unload(entry.add_update_listener(async_options_updated))
+    await async_setup_notifications(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
