@@ -123,7 +123,7 @@ class EmlaLockSessionNotifications:
                 self.state.update({"start": start, "last_daily_day": 0, "completion_notified": False})
                 changed = True
             elapsed_days = int(max(0, now - start) // 86400)
-            if (self.entry.options.get(CONF_NOTIFY_DAILY, False) or self.entry.options.get(CONF_NOTIFY_HA_DAILY, False)) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
+            if ((self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) and self.entry.options.get(CONF_NOTIFY_DAILY, False)) or (self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False) and self.entry.options.get(CONF_NOTIFY_HA_DAILY, False))) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
                 if await self._notify("emlalock 24-hour reminder", f"{name}: {elapsed_days} day(s) since the session started.", "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
