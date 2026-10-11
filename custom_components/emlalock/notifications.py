@@ -15,6 +15,8 @@ from datetime import timedelta
 
 from .const import (
     CONF_ENABLE_NOTIFICATIONS,
+    CONF_ENABLE_PHONE_NOTIFICATIONS,
+    CONF_ENABLE_HA_NOTIFICATIONS,
     CONF_NOTIFICATION_SERVICE,
     CONF_NOTIFY_DAILY,
     CONF_NOTIFY_COMPLETION,
@@ -77,7 +79,7 @@ class EmlaLockSessionNotifications:
         mobile_key = CONF_NOTIFY_DAILY if event == "daily" else CONF_NOTIFY_COMPLETION
         ha_key = CONF_NOTIFY_HA_DAILY if event == "daily" else CONF_NOTIFY_HA_COMPLETION
         delivered = False
-        if self.entry.options.get(mobile_key, False):
+        if self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) and self.entry.options.get(mobile_key, False):
             try:
                 await self.hass.services.async_call(
                     "notify", self.service, {"title": title, "message": message}, blocking=True
@@ -85,7 +87,7 @@ class EmlaLockSessionNotifications:
                 delivered = True
             except Exception:
                 _LOGGER.exception("Unable to send EmlaLock mobile notification through notify.%s", self.service)
-        if self.entry.options.get(ha_key, False):
+        if self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False) and self.entry.options.get(ha_key, False):
             try:
                 await self.hass.services.async_call(
                     "persistent_notification", "create",
@@ -143,6 +145,6 @@ class EmlaLockSessionNotifications:
 
 async def async_setup_notifications(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
     """Start notifications only after the master opt-in is enabled."""
-    if not entry.options.get(CONF_ENABLE_NOTIFICATIONS, False):
+    if not (entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) or entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)):
         return
     await EmlaLockSessionNotifications(hass, entry, coordinator).async_start()
