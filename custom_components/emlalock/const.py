@@ -19,3 +19,6 @@ DEFAULT_NOTIFICATION_SERVICE = "notify.notify"
 
 CONF_NOTIFY_HA_DAILY = "notify_ha_daily"
 CONF_NOTIFY_HA_COMPLETION = "notify_ha_completion"
+
+CONF_ENABLE_PHONE_NOTIFICATIONS = "enable_phone_notifications"
+CONF_ENABLE_HA_NOTIFICATIONS = "enable_ha_notifications"
