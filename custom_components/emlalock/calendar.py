@@ -64,7 +64,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
     """Expose the EmlaLock session start and end as a calendar event."""
 
     _attr_has_entity_name = True
-    _attr_name = "Session calendar"
+    _attr_name = "EmlaLock Session Calendar"
     _attr_icon = "mdi:calendar-lock"
 
     def __init__(self, coordinator: EmlaLockCoordinator, user_id: str) -> None:
