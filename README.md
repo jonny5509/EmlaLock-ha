@@ -1,7 +1,7 @@
 # EmlaLock for Home Assistant
 
 [![Version](https://img.shields.io/github/v/release/jonny5509/EmlaLock-ha?display_name=tag&sort=semver)](https://github.com/jonny5509/EmlaLock-ha/releases/latest)
-[![HACS](https://img.shields.io/badge/HACS-Custom%20Integration-41BDF5.svg)](https://hacs.xyz/)
+[![HACS](https://img.shields.io/badge/HACS-Compatible-41BDF5.svg)](https://hacs.xyz/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A Home Assistant custom integration for **EmlaLock**, including a bundled Lovelace card for displaying the current session and available actions.
@@ -32,6 +32,8 @@ A Home Assistant custom integration for **EmlaLock**, including a bundled Lovela
 
 ### HACS
 
+If EmlaLock is available in the HACS default store:
+
 1. Open **HACS → Integrations**.
 2. Search for **EmlaLock** and select **Download**.
 3. Restart Home Assistant.
@@ -39,9 +41,13 @@ A Home Assistant custom integration for **EmlaLock**, including a bundled Lovela
 5. Select **Add Integration**.
 6. Search for **EmlaLock** and complete the configuration.
 
-If EmlaLock is not yet listed in HACS, add this repository as a custom repository:
+Until it is included in the HACS default store, add this repository as a custom repository:
 
-`https://github.com/jonny5509/EmlaLock-ha`
+1. Open **HACS → Integrations**.
+2. Open the three-dot menu and choose **Custom repositories**.
+3. Add `https://github.com/jonny5509/EmlaLock-ha` and choose **Integration** as the category.
+4. Add EmlaLock, download it, and restart Home Assistant.
+5. Open **Settings → Devices & services → Add Integration**, then search for **EmlaLock**.
 
 ### Manual installation
 
@@ -135,6 +141,5 @@ The bundled card source/build files are maintained alongside the integration. Wh
 ## 📄 License
 
 See [LICENSE](LICENSE) for the current project license.
-
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jonny5509)
