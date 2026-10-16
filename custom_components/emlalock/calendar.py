@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.dt import as_local
 
 from .const import CONF_USER_ID, DOMAIN
 from .coordinator import EmlaLockCoordinator
@@ -80,7 +81,11 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         saved = await self._store.async_load()
         if isinstance(saved, dict) and isinstance(saved.get("events"), list):
             self._history = [
-                {**item, "summary": "EmlaLock — Active session"} for item in saved["events"]
+                {
+                    **item,
+                    "summary": self._summary_for_start(_parse_saved(item.get("start"))),
+                }
+                for item in saved["events"]
                 if isinstance(item, dict)
                 and isinstance(item.get("uid"), str)
                 and isinstance(item.get("start"), str)
@@ -94,6 +99,13 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
             await self._save_task
         await super().async_will_remove_from_hass()
 
+    @staticmethod
+    def _summary_for_start(start: datetime | None) -> str:
+        """Format the calendar title with the session start time in local time."""
+        if start is None:
+            return "EmlaLock — Active session"
+        return f"EmlaLock — Active session — started {as_local(start).strftime('%H:%M')}"
+
     def _current_event(self) -> CalendarEvent | None:
         session = _session(self.coordinator)
         start = _datetime_value(session.get("startdate"))
@@ -103,7 +115,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
         user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
-        title = "EmlaLock — Active session"
+        title = self._summary_for_start(start)
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
         status_value = session.get("status")
         active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
