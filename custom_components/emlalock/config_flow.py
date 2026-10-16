@@ -104,10 +104,31 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         options = self.config_entry.options
-        notify_services = sorted(self.hass.services.async_services().get("notify", {}))
-        if "notify" not in notify_services:
-            notify_services.insert(0, "notify")
-        service_options = [{"value": f"notify.{name}", "label": name} for name in notify_services]
+        # The target picker is specifically for Home Assistant Companion App phones.
+        # Other notify services (email, chat, speakers, etc.) are not phone targets.
+        notify_services = sorted(
+            name
+            for name in self.hass.services.async_services().get("notify", {})
+            if name.startswith("mobile_app_")
+        )
+        service_options = [
+            {
+                "value": f"notify.{name}",
+                "label": name.removeprefix("mobile_app_").replace("_", " "),
+            }
+            for name in notify_services
+        ]
+        # Keep already-selected phone targets available if service discovery is
+        # temporarily incomplete during startup.
+        for target in options.get(CONF_NOTIFICATION_TARGETS, []):
+            service_name = str(target).removeprefix("notify.")
+            if service_name.startswith("mobile_app_") and all(
+                item["value"] != f"notify.{service_name}" for item in service_options
+            ):
+                service_options.append({
+                    "value": f"notify.{service_name}",
+                    "label": service_name.removeprefix("mobile_app_").replace("_", " "),
+                })
         destination = options.get(CONF_NOTIFICATION_DESTINATION, "both" if options.get("enable_phone_notifications", False) and options.get("enable_ha_notifications", False) else "phone" if options.get("enable_phone_notifications", False) else "home_assistant")
         return self.async_show_form(
             step_id="init",
