@@ -80,7 +80,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         saved = await self._store.async_load()
         if isinstance(saved, dict) and isinstance(saved.get("events"), list):
             self._history = [
-                item for item in saved["events"]
+                {**item, "summary": "EmlaLock — Active session"} for item in saved["events"]
                 if isinstance(item, dict)
                 and isinstance(item.get("uid"), str)
                 and isinstance(item.get("start"), str)
@@ -103,7 +103,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
         user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
-        title = f"{username} - EmlaLock session" if username else "EmlaLock session"
+        title = "EmlaLock — Active session"
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
         status_value = session.get("status")
         active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
