@@ -76,33 +76,31 @@ class EmlaLockSessionNotifications:
         await self.async_check()
 
     async def _notify(self, title: str, message: str, event: str) -> bool:
-        """Send to the selected mobile service and/or Home Assistant."""
-        mobile_key = CONF_NOTIFY_DAILY if event == "daily" else CONF_NOTIFY_COMPLETION
-        ha_key = CONF_NOTIFY_HA_DAILY if event == "daily" else CONF_NOTIFY_HA_COMPLETION
-        delivered = False
+        """Send notifications to the selected destination."""
         destination = self.entry.options.get(CONF_NOTIFICATION_DESTINATION)
-        phone_enabled = destination in ("phone", "both") if destination else self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
-        ha_enabled = destination in ("home_assistant", "both") if destination else self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
-        if phone_enabled and self.entry.options.get(mobile_key, False):
-            try:
-                targets = self.entry.options.get(CONF_NOTIFICATION_TARGETS, [])
-                if targets:
-                    for target in targets:
-                        service_name = str(target).removeprefix("notify.")
-                        await self.hass.services.async_call(
-                            "notify", service_name, {"title": title, "message": message}, blocking=True
-                        )
+        if destination not in {"none", "home_assistant", "phone", "both"}:
+            phone = self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+            ha = self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+            destination = "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
+        delivered = False
+        if destination in {"phone", "both"}:
+            targets = self.entry.options.get(CONF_NOTIFICATION_TARGETS, [])
+            services = []
+            if isinstance(targets, list):
+                for target in targets:
+                    if isinstance(target, str):
+                        service = target.split(".", 1)[1] if target.startswith("notify.") else target
+                        if re.fullmatch(r"mobile_app_[a-z0-9_]+", service) and service not in services:
+                            services.append(service)
+            if not services and re.fullmatch(r"notify\\.[a-z0-9_]+", self.service):
+                services = [self.service.split(".", 1)[1]]
+            for service in services:
+                try:
+                    await self.hass.services.async_call("notify", service, {"title": title, "message": message}, blocking=True)
                     delivered = True
-                else:
-                    service = self.service
-                    if re.fullmatch(r"notify\.[a-z0-9_]+", service):
-                        await self.hass.services.async_call(
-                            "notify", service.split(".", 1)[1], {"title": title, "message": message}, blocking=True
-                        )
-                        delivered = True
-            except Exception:
-                _LOGGER.exception("Unable to send EmlaLock mobile notification through notify.%s", self.service)
-        if ha_enabled and self.entry.options.get(ha_key, False):
+                except Exception:
+                    _LOGGER.exception("Unable to send EmlaLock phone notification through notify.%s", service)
+        if destination in {"home_assistant", "both"}:
             try:
                 await self.hass.services.async_call(
                     "persistent_notification", "create",
@@ -141,13 +139,13 @@ class EmlaLockSessionNotifications:
             destination = self.entry.options.get(CONF_NOTIFICATION_DESTINATION)
             phone_enabled = destination in ("phone", "both") if destination else self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
             ha_enabled = destination in ("home_assistant", "both") if destination else self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
-            if ((phone_enabled and self.entry.options.get(CONF_NOTIFY_DAILY, False)) or (ha_enabled and self.entry.options.get(CONF_NOTIFY_HA_DAILY, False))) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
+            if destination != "none" and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
                 daily_message = f"🎉 Congratulations! You've completed day number {elapsed_days} of your EmlaLock session. Keep it going!"
                 if await self._notify("EmlaLock daily congratulations", daily_message, "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
-            if self.entry.options.get(CONF_NOTIFY_COMPLETION, False) or self.entry.options.get(CONF_NOTIFY_HA_COMPLETION, False):
+            if self.entry.options.get(CONF_NOTIFICATION_DESTINATION, "both") != "none":
                 elapsed_days = int(max(0, now - start) // 86400) if start is not None else 0
                 duration = "day" if elapsed_days == 1 else "days"
                 completion_message = f"🏆 Congratulations! {name} has completed the session after {elapsed_days} {duration}. Well done!"
