@@ -142,12 +142,16 @@ class EmlaLockSessionNotifications:
             phone_enabled = destination in ("phone", "both") if destination else self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
             ha_enabled = destination in ("home_assistant", "both") if destination else self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
             if ((phone_enabled and self.entry.options.get(CONF_NOTIFY_DAILY, False)) or (ha_enabled and self.entry.options.get(CONF_NOTIFY_HA_DAILY, False))) and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
-                if await self._notify("emlalock 24-hour reminder", f"{name}: {elapsed_days} day(s) since the session started.", "daily"):
+                daily_message = f"🎉 Congratulations! You've completed day number {elapsed_days} of your EmlaLock session. Keep it going!"
+                if await self._notify("EmlaLock daily congratulations", daily_message, "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
             if self.entry.options.get(CONF_NOTIFY_COMPLETION, False) or self.entry.options.get(CONF_NOTIFY_HA_COMPLETION, False):
-                if await self._notify("emlalock session ended", f"{name} has ended.", "completion"):
+                elapsed_days = int(max(0, now - start) // 86400) if start is not None else 0
+                duration = "day" if elapsed_days == 1 else "days"
+                completion_message = f"🏆 Congratulations! {name} has completed the session after {elapsed_days} {duration}. Well done!"
+                if await self._notify("EmlaLock session completed", completion_message, "completion"):
                     self.state["completion_notified"] = True
                     changed = True
             else:
