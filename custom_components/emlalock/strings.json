@@ -23,6 +23,8 @@
         "title": "EmlaLock notification settings",
         "description": "Choose where and when you want notifications. All notification options are off by default.",
         "data": {
+          "notification_destination": "Monthly theme notification destination",
+          "notification_targets": "Phone notification targets (select one or multiple phones)",
           "enable_phone_notifications": "Enable phone notifications",
           "notification_service": "Phone to notify",
           "notify_daily": "Phone: notify every 24 hours",
@@ -32,6 +34,8 @@
           "notify_ha_completion": "Home Assistant: notify when session ends"
         },
         "data_description": {
+          "notification_destination": "Choose Home Assistant, phone notifications, or both.",
+          "notification_targets": "Select one or more notify entities for phone push notifications.",
           "enable_phone_notifications": "Sends push notifications to your selected Home Assistant mobile app.",
           "notification_service": "Choose the notify service for the phone that should receive alerts.",
           "notify_daily": "Send a phone push notification every 24 hours during a session.",
