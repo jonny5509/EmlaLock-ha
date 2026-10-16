@@ -122,10 +122,10 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
         user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
-        title = self._summary_for_start(start, include_day=active)
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
         status_value = session.get("status")
         active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
+        title = self._summary_for_start(start, include_day=active)
         now = datetime.now(timezone.utc)
         # A scheduled end time is not proof that the session ended. Keep an
         # active overdue session visible and refresh its calendar end forward.
