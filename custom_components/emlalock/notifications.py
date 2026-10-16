@@ -24,6 +24,8 @@ from .const import (
     CONF_NOTIFY_HA_COMPLETION,
     DEFAULT_NOTIFICATION_SERVICE,
     DOMAIN,
+    CONF_NOTIFICATION_DESTINATION,
+    CONF_NOTIFICATION_TARGETS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,8 +61,7 @@ class EmlaLockSessionNotifications:
         self.coordinator = coordinator
         self.store = Store(hass, 1, f"{DOMAIN}_session_notifications_{entry.entry_id}")
         self.state: dict[str, Any] = {}
-        service = str(entry.options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
-        self.service = service.split(".", 1)[1] if re.fullmatch(r"notify\.[a-z0-9_]+", service) else "notify"
+        self.service = str(entry.options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
 
     async def async_start(self) -> None:
         saved = await self.store.async_load()
@@ -79,15 +80,29 @@ class EmlaLockSessionNotifications:
         mobile_key = CONF_NOTIFY_DAILY if event == "daily" else CONF_NOTIFY_COMPLETION
         ha_key = CONF_NOTIFY_HA_DAILY if event == "daily" else CONF_NOTIFY_HA_COMPLETION
         delivered = False
-        if self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) and self.entry.options.get(mobile_key, False):
+        destination = self.entry.options.get(CONF_NOTIFICATION_DESTINATION)
+        phone_enabled = destination in ("phone", "both") if destination else self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+        ha_enabled = destination in ("home_assistant", "both") if destination else self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+        if phone_enabled and self.entry.options.get(mobile_key, False):
             try:
-                await self.hass.services.async_call(
-                    "notify", self.service, {"title": title, "message": message}, blocking=True
-                )
-                delivered = True
+                targets = self.entry.options.get(CONF_NOTIFICATION_TARGETS, [])
+                if targets:
+                    for target in targets:
+                        service_name = str(target).removeprefix("notify.")
+                        await self.hass.services.async_call(
+                            "notify", service_name, {"title": title, "message": message}, blocking=True
+                        )
+                    delivered = True
+                else:
+                    service = self.service
+                    if re.fullmatch(r"notify\.[a-z0-9_]+", service):
+                        await self.hass.services.async_call(
+                            "notify", service.split(".", 1)[1], {"title": title, "message": message}, blocking=True
+                        )
+                        delivered = True
             except Exception:
                 _LOGGER.exception("Unable to send EmlaLock mobile notification through notify.%s", self.service)
-        if self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False) and self.entry.options.get(ha_key, False):
+        if ha_enabled and self.entry.options.get(ha_key, False):
             try:
                 await self.hass.services.async_call(
                     "persistent_notification", "create",
@@ -145,6 +160,10 @@ class EmlaLockSessionNotifications:
 
 async def async_setup_notifications(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
     """Start notifications only after the master opt-in is enabled."""
-    if not (entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) or entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)):
+    destination = entry.options.get(CONF_NOTIFICATION_DESTINATION)
+    enabled = destination in ("phone", "both", "home_assistant") if destination else (
+        entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) or entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+    )
+    if not enabled:
         return
     await EmlaLockSessionNotifications(hass, entry, coordinator).async_start()
