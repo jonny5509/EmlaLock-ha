@@ -19,17 +19,51 @@
   },
   "entity": {
     "sensor": {
-      "time_remaining": {"name": "Time remaining"},
-      "session": {"name": "Session"},
-      "requirement_links": {"name": "Requirement links"},
-      "maximum_duration": {"name": "Maximum duration"},
-      "minimum_duration": {"name": "Minimum duration"},
-      "time_passed": {"name": "Time passed"},
-      "start_date": {"name": "Start date"},
-      "end_date": {"name": "End date"}
+      "time_remaining": {
+        "name": "Time remaining"
+      },
+      "session": {
+        "name": "Session"
+      },
+      "requirement_links": {
+        "name": "Requirement links"
+      },
+      "maximum_duration": {
+        "name": "Maximum duration"
+      },
+      "minimum_duration": {
+        "name": "Minimum duration"
+      },
+      "time_passed": {
+        "name": "Time passed"
+      },
+      "start_date": {
+        "name": "Start date"
+      },
+      "end_date": {
+        "name": "End date"
+      }
     },
     "binary_sensor": {
-      "session_active": {"name": "Session active"}
+      "session_active": {
+        "name": "Session active"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "EmlaLock notification settings",
+        "description": "Choose where EmlaLock notifications are sent. Phone notifications can be delivered to multiple selected phones.",
+        "data": {
+          "notification_destination": "Notification destination",
+          "notification_targets": "Phones to notify"
+        },
+        "data_description": {
+          "notification_destination": "Choose None, Home Assistant notifications, Phone notifications, or both.",
+          "notification_targets": "Select one or more Home Assistant Companion App phones for push notifications."
+        }
+      }
     }
   }
 }

@@ -129,26 +129,33 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
                     "value": f"notify.{service_name}",
                     "label": service_name.removeprefix("mobile_app_").replace("_", " "),
                 })
-        destination = options.get(CONF_NOTIFICATION_DESTINATION, "both" if options.get("enable_phone_notifications", False) and options.get("enable_ha_notifications", False) else "phone" if options.get("enable_phone_notifications", False) else "home_assistant")
+        destination = options.get(CONF_NOTIFICATION_DESTINATION)
+        if destination not in {"none", "home_assistant", "phone", "both"}:
+            phone = options.get("enable_phone_notifications", False)
+            ha = options.get("enable_ha_notifications", False)
+            destination = "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
+        notify_services = sorted(name for name in self.hass.services.async_services().get("notify", {}) if name.startswith("mobile_app_"))
+        service_options = [
+            {"value": f"notify.{name}", "label": name.removeprefix("mobile_app_").replace("_", " ")}
+            for name in notify_services
+        ]
+        for target in options.get(CONF_NOTIFICATION_TARGETS, []):
+            service_name = str(target).removeprefix("notify.")
+            if service_name.startswith("mobile_app_") and all(item["value"] != f"notify.{service_name}" for item in service_options):
+                service_options.append({"value": f"notify.{service_name}", "label": service_name.removeprefix("mobile_app_").replace("_", " ")})
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
                 vol.Optional(CONF_NOTIFICATION_DESTINATION, default=destination): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            {"value": "home_assistant", "label": "Home Assistant"},
-                            {"value": "phone", "label": "Phone notification(s)"},
-                            {"value": "both", "label": "Home Assistant and phone"},
-                        ],
-                        mode=selector.SelectSelectorMode.LIST,
-                    )
+                    selector.SelectSelectorConfig(options=[
+                        {"value": "none", "label": "None"},
+                        {"value": "home_assistant", "label": "Home Assistant notifications"},
+                        {"value": "phone", "label": "Phone notifications"},
+                        {"value": "both", "label": "Home Assistant and phone"},
+                    ], mode=selector.SelectSelectorMode.DROPDOWN)
                 ),
                 vol.Optional(CONF_NOTIFICATION_TARGETS, default=options.get(CONF_NOTIFICATION_TARGETS, [])): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=service_options, multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 ),
-                vol.Optional(CONF_NOTIFY_HA_DAILY, default=options.get(CONF_NOTIFY_HA_DAILY, False)): bool,
-                vol.Optional(CONF_NOTIFY_HA_COMPLETION, default=options.get(CONF_NOTIFY_HA_COMPLETION, False)): bool,
-                vol.Optional(CONF_NOTIFY_DAILY, default=options.get(CONF_NOTIFY_DAILY, False)): bool,
-                vol.Optional(CONF_NOTIFY_COMPLETION, default=options.get(CONF_NOTIFY_COMPLETION, False)): bool,
             }),
         )
