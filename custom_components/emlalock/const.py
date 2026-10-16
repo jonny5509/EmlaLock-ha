@@ -22,3 +22,6 @@ CONF_NOTIFY_HA_COMPLETION = "notify_ha_completion"
 
 CONF_ENABLE_PHONE_NOTIFICATIONS = "enable_phone_notifications"
 CONF_ENABLE_HA_NOTIFICATIONS = "enable_ha_notifications"
+
+CONF_NOTIFICATION_DESTINATION = "notification_destination"
+CONF_NOTIFICATION_TARGETS = "notification_targets"
