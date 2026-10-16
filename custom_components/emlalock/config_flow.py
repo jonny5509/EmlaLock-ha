@@ -104,6 +104,10 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         options = self.config_entry.options
+        notify_services = sorted(self.hass.services.async_services().get("notify", {}))
+        if "notify" not in notify_services:
+            notify_services.insert(0, "notify")
+        service_options = [{"value": f"notify.{name}", "label": name} for name in notify_services]
         destination = options.get(CONF_NOTIFICATION_DESTINATION, "both" if options.get("enable_phone_notifications", False) and options.get("enable_ha_notifications", False) else "phone" if options.get("enable_phone_notifications", False) else "home_assistant")
         return self.async_show_form(
             step_id="init",
@@ -118,8 +122,8 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
                         mode=selector.SelectSelectorMode.LIST,
                     )
                 ),
-                vol.Optional(CONF_NOTIFICATION_TARGETS, default=options.get(CONF_NOTIFICATION_TARGETS, [])): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="notify", multiple=True)
+                vol.Optional(CONF_NOTIFICATION_TARGETS, default=options.get(CONF_NOTIFICATION_TARGETS, [])): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=service_options, multiple=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 ),
                 vol.Optional(CONF_NOTIFY_HA_DAILY, default=options.get(CONF_NOTIFY_HA_DAILY, False)): bool,
                 vol.Optional(CONF_NOTIFY_HA_COMPLETION, default=options.get(CONF_NOTIFY_HA_COMPLETION, False)): bool,
