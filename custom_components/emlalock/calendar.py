@@ -100,11 +100,18 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         await super().async_will_remove_from_hass()
 
     @staticmethod
-    def _summary_for_start(start: datetime | None) -> str:
-        """Format the calendar title with the session start time in local time."""
+    def _summary_for_start(start: datetime | None, *, include_day: bool = False) -> str:
+        """Format the title with local start time and optionally elapsed session day."""
         if start is None:
             return "EmlaLock — Active session"
-        return f"EmlaLock — Active session — started {as_local(start).strftime('%H:%M')}"
+        local_start = as_local(start)
+        summary = f"EmlaLock — Active session — started {local_start.strftime('%H:%M')}"
+        if include_day:
+            elapsed = datetime.now(timezone.utc) - start.astimezone(timezone.utc)
+            day_number = max(1, elapsed.days + 1)
+            if day_number > 1:
+                summary += f" — Day {day_number}"
+        return summary
 
     def _current_event(self) -> CalendarEvent | None:
         session = _session(self.coordinator)
@@ -115,7 +122,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         data = self.coordinator.data if isinstance(self.coordinator.data, dict) else {}
         user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
-        title = self._summary_for_start(start)
+        title = self._summary_for_start(start, include_day=active)
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
         status_value = session.get("status")
         active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
