@@ -138,7 +138,29 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
 
     @property
     def event(self) -> CalendarEvent | None:
-        return self._current_event()
+        """Expose the current session as an all-day event for the local day."""
+        current = self._current_event()
+        if current is None:
+            return None
+        session = _session(self.coordinator)
+        status_value = session.get("status")
+        active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
+        if not active:
+            return current
+        local_start = as_local(current.start)
+        event_day = local_start.date()
+        summary = (
+            current.summary
+            if event_day == local_start.date()
+            else "EmlaLock — Active session"
+        )
+        return CalendarEvent(
+            summary=summary,
+            start=event_day,
+            end=event_day + timedelta(days=1),
+            description=current.description,
+            uid=f"{current.uid}-{event_day.isoformat()}",
+        )
 
     def _queue_save(self) -> None:
         snapshot = {"events": [dict(item) for item in self._history]}
@@ -229,12 +251,13 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
                         if first_segment
                         else "EmlaLock — Active session"
                     )
+                    event_day = local_start.date()
                     events.append(CalendarEvent(
                         summary=summary,
-                        start=segment_start,
-                        end=segment_end,
+                        start=event_day,
+                        end=event_day + timedelta(days=1),
                         description=description,
-                        uid=f"{item['uid']}-{local_start.date().isoformat()}",
+                        uid=f"{item['uid']}-{event_day.isoformat()}",
                     ))
                     segment_start = segment_end
                     first_segment = False
