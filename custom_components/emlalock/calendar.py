@@ -142,9 +142,13 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         current = self._current_event()
         if current is None:
             return None
+        session = _session(self.coordinator)
+        status_value = session.get("status")
+        active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
+        if not active:
+            return current
         local_start = as_local(current.start)
-        local_today = as_local(datetime.now(timezone.utc)).date()
-        event_day = max(local_start.date(), local_today)
+        event_day = local_start.date()
         summary = (
             current.summary
             if event_day == local_start.date()
@@ -152,7 +156,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         )
         return CalendarEvent(
             summary=summary,
-            start=event_day.date() if isinstance(event_day, datetime) else event_day,
+            start=event_day,
             end=event_day + timedelta(days=1),
             description=current.description,
             uid=f"{current.uid}-{event_day.isoformat()}",
