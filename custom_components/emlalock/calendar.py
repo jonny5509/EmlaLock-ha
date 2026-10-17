@@ -100,18 +100,12 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         await super().async_will_remove_from_hass()
 
     @staticmethod
-    def _summary_for_start(start: datetime | None, *, include_day: bool = False) -> str:
-        """Format the title with local start time and optionally elapsed session day."""
+    def _summary_for_start(start: datetime | None) -> str:
+        """Format the title with the session start time in local time."""
         if start is None:
             return "EmlaLock — Active session"
         local_start = as_local(start)
-        summary = f"EmlaLock — Active session — started {local_start.strftime('%H:%M')}"
-        if include_day:
-            elapsed = datetime.now(timezone.utc) - start.astimezone(timezone.utc)
-            day_number = max(1, elapsed.days + 1)
-            if day_number > 1:
-                summary += f" — Day {day_number}"
-        return summary
+        return f"EmlaLock — Active session — started {local_start.strftime('%H:%M')}"
 
     def _current_event(self) -> CalendarEvent | None:
         session = _session(self.coordinator)
@@ -125,7 +119,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
         status_value = session.get("status")
         active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
-        title = self._summary_for_start(start, include_day=active)
+        title = self._summary_for_start(start)
         now = datetime.now(timezone.utc)
         # A scheduled end time is not proof that the session ended. Keep an
         # active overdue session visible and refresh its calendar end forward.
@@ -217,11 +211,39 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
             end = _parse_saved(item.get("end"))
             if start is None or end is None or end <= start or end <= start_bound or start >= end_bound:
                 continue
-            events.append(CalendarEvent(
-                summary=str(item.get("summary") or "EmlaLock session"),
-                start=start, end=end, description=str(item.get("description") or ""),
-                uid=str(item["uid"]),
-            ))
+            description = str(item.get("description") or "")
+            if item.get("active"):
+                # Split active sessions at local midnight, respecting DST.
+                segment_start = start
+                first_segment = True
+                while segment_start < end:
+                    local_start = as_local(segment_start)
+                    next_midnight = local_start.replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    ) + timedelta(days=1)
+                    segment_end = min(end, next_midnight.astimezone(timezone.utc))
+                    if segment_end <= segment_start:
+                        break
+                    summary = (
+                        str(item.get("summary") or "EmlaLock — Active session")
+                        if first_segment
+                        else "EmlaLock — Active session"
+                    )
+                    events.append(CalendarEvent(
+                        summary=summary,
+                        start=segment_start,
+                        end=segment_end,
+                        description=description,
+                        uid=f"{item['uid']}-{local_start.date().isoformat()}",
+                    ))
+                    segment_start = segment_end
+                    first_segment = False
+            else:
+                events.append(CalendarEvent(
+                    summary=str(item.get("summary") or "EmlaLock session"),
+                    start=start, end=end, description=description,
+                    uid=str(item["uid"]),
+                ))
         return sorted(events, key=lambda event: event.start)
 
 
