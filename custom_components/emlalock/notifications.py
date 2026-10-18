@@ -18,6 +18,8 @@ from .const import (
     CONF_NOTIFICATION_DESTINATION,
     CONF_NOTIFICATION_SERVICE,
     CONF_NOTIFICATION_TARGETS,
+    CONF_NOTIFY_DAILY,
+    CONF_NOTIFY_COMPLETION,
     DEFAULT_NOTIFICATION_SERVICE,
     DOMAIN,
 )
@@ -170,6 +172,7 @@ class EmlaLockSessionNotifications:
             elapsed_days = max(0, int((now - start) // _DAY_SECONDS))
             if (
                 _destination(self.entry.options) != "none"
+                and self.entry.options.get(CONF_NOTIFY_DAILY, True)
                 and elapsed_days >= 1
                 and elapsed_days > int(self.state.get("last_daily_day", 0))
             ):
@@ -181,7 +184,7 @@ class EmlaLockSessionNotifications:
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
             saved_start = _timestamp(self.state.get("start"))
             elapsed_days = max(0, int((now - saved_start) // _DAY_SECONDS)) if saved_start is not None else 0
-            if _destination(self.entry.options) != "none":
+            if _destination(self.entry.options) != "none" and self.entry.options.get(CONF_NOTIFY_COMPLETION, True):
                 title = "Session completed"
                 message = f"🏆 {name} is complete after {_duration(elapsed_days)}. Well done!"
                 if await self._notify(title, message, "completion"):
