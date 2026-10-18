@@ -1,38 +1,37 @@
-"""Opt-in 24-hour session reminders and session-ended notifications."""
+"""Consistent, restart-safe session milestone and completion notifications."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.event import async_track_time_interval
-from datetime import timedelta
+from homeassistant.helpers.storage import Store
 
 from .const import (
-    CONF_ENABLE_NOTIFICATIONS,
     CONF_ENABLE_PHONE_NOTIFICATIONS,
     CONF_ENABLE_HA_NOTIFICATIONS,
+    CONF_NOTIFICATION_DESTINATION,
     CONF_NOTIFICATION_SERVICE,
+    CONF_NOTIFICATION_TARGETS,
     CONF_NOTIFY_DAILY,
     CONF_NOTIFY_COMPLETION,
-    CONF_NOTIFY_HA_DAILY,
-    CONF_NOTIFY_HA_COMPLETION,
     DEFAULT_NOTIFICATION_SERVICE,
     DOMAIN,
-    CONF_NOTIFICATION_DESTINATION,
-    CONF_NOTIFICATION_TARGETS,
 )
 
 _LOGGER = logging.getLogger(__name__)
 _CHECK_INTERVAL = timedelta(minutes=1)
+_PHONE_SERVICE = re.compile(r"notify\.mobile_app_[a-z0-9_]+")
+_DAY_SECONDS = 86400
 
 
 def _timestamp(value: Any) -> float | None:
+    """Parse API timestamps, accepting seconds, milliseconds, and ISO dates."""
     if value is None or value == "" or isinstance(value, bool):
         return None
     try:
@@ -52,8 +51,42 @@ def _timestamp(value: Any) -> float | None:
         return None
 
 
+def _destination(options: dict[str, Any]) -> str:
+    """Normalize current and legacy destination option values."""
+    value = options.get(CONF_NOTIFICATION_DESTINATION)
+    if value == "ha":
+        value = "home_assistant"
+    if value in {"none", "home_assistant", "phone", "both"}:
+        return value
+    phone = options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+    ha = options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+    return "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
+
+
+def _phone_targets(options: dict[str, Any]) -> list[str]:
+    """Return unique mobile-app notify services, including legacy settings."""
+    targets = options.get(CONF_NOTIFICATION_TARGETS)
+    if isinstance(targets, str):
+        targets = [targets]
+    if targets is None:
+        targets = [options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE)]
+    services: list[str] = []
+    for target in targets if isinstance(targets, list) else []:
+        if not isinstance(target, str):
+            continue
+        service = target if target.startswith("notify.") else f"notify.{target}"
+        if _PHONE_SERVICE.fullmatch(service) and service not in services:
+            services.append(service)
+    return services
+
+
+def _duration(days: int) -> str:
+    """Format elapsed days consistently across integrations."""
+    return f"{days} day" if days == 1 else f"{days} days"
+
+
 class EmlaLockSessionNotifications:
-    """Track session milestones and persist notification delivery state."""
+    """Track session milestones and persist successful notification delivery."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
         self.hass = hass
@@ -61,12 +94,10 @@ class EmlaLockSessionNotifications:
         self.coordinator = coordinator
         self.store = Store(hass, 1, f"{DOMAIN}_session_notifications_{entry.entry_id}")
         self.state: dict[str, Any] = {}
-        self.service = str(entry.options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
 
     async def async_start(self) -> None:
         saved = await self.store.async_load()
-        if isinstance(saved, dict):
-            self.state = saved
+        self.state = saved if isinstance(saved, dict) else {}
         self.entry.async_on_unload(
             async_track_time_interval(self.hass, self._tick, _CHECK_INTERVAL)
         )
@@ -76,84 +107,90 @@ class EmlaLockSessionNotifications:
         await self.async_check()
 
     async def _notify(self, title: str, message: str, event: str) -> bool:
-        """Send notifications to the selected destination."""
-        destination = self.entry.options.get(CONF_NOTIFICATION_DESTINATION)
-        if destination not in {"none", "home_assistant", "phone", "both"}:
-            phone = self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
-            ha = self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
-            destination = "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
+        """Send the same notification payload to selected phone and HA destinations."""
+        options = self.entry.options
+        destination = _destination(options)
         delivered = False
         if destination in {"phone", "both"}:
-            targets = self.entry.options.get(CONF_NOTIFICATION_TARGETS, [])
-            services = []
-            if isinstance(targets, list):
-                for target in targets:
-                    if isinstance(target, str):
-                        service = target.split(".", 1)[1] if target.startswith("notify.") else target
-                        if re.fullmatch(r"mobile_app_[a-z0-9_]+", service) and service not in services:
-                            services.append(service)
-            if not services and re.fullmatch(r"notify\\.[a-z0-9_]+", self.service):
-                services = [self.service.split(".", 1)[1]]
-            for service in services:
+            for service in _phone_targets(options):
                 try:
-                    await self.hass.services.async_call("notify", service, {"title": title, "message": message}, blocking=True)
+                    domain, name = service.split(".", 1)
+                    await self.hass.services.async_call(
+                        domain, name, {"title": title, "message": message}, blocking=True
+                    )
                     delivered = True
                 except Exception:
-                    _LOGGER.exception("Unable to send EmlaLock phone notification through notify.%s", service)
+                    _LOGGER.exception("Unable to send %s phone notification via %s", DOMAIN, service)
         if destination in {"home_assistant", "both"}:
             try:
                 await self.hass.services.async_call(
-                    "persistent_notification", "create",
-                    {"title": title, "message": message, "notification_id": f"{DOMAIN}_{self.entry.entry_id}_{event}"},
+                    "persistent_notification",
+                    "create",
+                    {
+                        "title": title,
+                        "message": message,
+                        "notification_id": f"{DOMAIN}_{self.entry.entry_id}_{event}",
+                    },
                     blocking=True,
                 )
                 delivered = True
             except Exception:
-                _LOGGER.exception("Unable to create EmlaLock Home Assistant notification")
+                _LOGGER.exception("Unable to create %s Home Assistant notification", DOMAIN)
         return delivered
 
     async def async_check(self) -> None:
         data = self.coordinator.data
         if not isinstance(data, dict):
             return
-        session = data.get("chastitysession") or {}
+        session = data.get("chastitysession")
         if not isinstance(session, dict):
             session = {}
+
         status = session.get("status")
-        active = status is True or (isinstance(status, (int, float)) and status != 0) or (isinstance(status, str) and status.strip().lower() in {"active", "locked", "true", "1"})
+        active = (
+            status is True
+            or (isinstance(status, (int, float)) and not isinstance(status, bool) and status != 0)
+            or (isinstance(status, str) and status.strip().lower() in {"active", "locked", "true", "1"})
+        )
         start = _timestamp(session.get("startdate"))
         now = datetime.now(timezone.utc).timestamp()
-        name = str((data.get("user") or {}).get("username") or "emlalock session")
+        user = data.get("user")
+        name = str((user.get("username") if isinstance(user, dict) else None) or "EmlaLock session")
         changed = False
 
         if active and start is not None and start <= now:
-            if not self.state.get("active_seen"):
-                self.state["active_seen"] = True
-                self.state["start"] = start
+            saved_start = _timestamp(self.state.get("start"))
+            if not self.state.get("active_seen") or saved_start is None or abs(saved_start - start) > 60:
+                self.state.update({
+                    "active_seen": True,
+                    "start": start,
+                    "last_daily_day": 0,
+                    "completion_notified": False,
+                })
                 changed = True
-            # A changed start timestamp means a new session; reset milestone state.
-            if self.state.get("start") != start:
-                self.state.update({"start": start, "last_daily_day": 0, "completion_notified": False})
-                changed = True
-            elapsed_days = int(max(0, now - start) // 86400)
-            destination = self.entry.options.get(CONF_NOTIFICATION_DESTINATION)
-            phone_enabled = destination in ("phone", "both") if destination else self.entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
-            ha_enabled = destination in ("home_assistant", "both") if destination else self.entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
-            if destination != "none" and elapsed_days >= 1 and elapsed_days > int(self.state.get("last_daily_day", 0)):
-                daily_message = f"🎉 Congratulations! You've completed day number {elapsed_days} of your EmlaLock session. Keep it going!"
-                if await self._notify("EmlaLock daily congratulations", daily_message, "daily"):
+
+            elapsed_days = max(0, int((now - start) // _DAY_SECONDS))
+            if (
+                _destination(self.entry.options) != "none"
+                and self.entry.options.get(CONF_NOTIFY_DAILY, True)
+                and elapsed_days >= 1
+                and elapsed_days > int(self.state.get("last_daily_day", 0))
+            ):
+                title = "Session milestone reached"
+                message = f"🎉 Day {elapsed_days} complete for {name}. Keep it going!"
+                if await self._notify(title, message, "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
-            if self.entry.options.get(CONF_NOTIFICATION_DESTINATION, "both") != "none":
-                elapsed_days = int(max(0, now - start) // 86400) if start is not None else 0
-                duration = "day" if elapsed_days == 1 else "days"
-                completion_message = f"🏆 Congratulations! {name} has completed the session after {elapsed_days} {duration}. Well done!"
-                if await self._notify("EmlaLock session completed", completion_message, "completion"):
+            saved_start = _timestamp(self.state.get("start"))
+            elapsed_days = max(0, int((now - saved_start) // _DAY_SECONDS)) if saved_start is not None else 0
+            if _destination(self.entry.options) != "none" and self.entry.options.get(CONF_NOTIFY_COMPLETION, True):
+                title = "Session completed"
+                message = f"🏆 {name} is complete after {_duration(elapsed_days)}. Well done!"
+                if await self._notify(title, message, "completion"):
                     self.state["completion_notified"] = True
                     changed = True
             else:
-                # Do not send a delayed completion alert if the option is enabled later.
                 self.state["completion_notified"] = True
                 changed = True
             self.state["active_seen"] = False
@@ -164,11 +201,7 @@ class EmlaLockSessionNotifications:
 
 
 async def async_setup_notifications(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
-    """Start notifications only after the master opt-in is enabled."""
-    destination = entry.options.get(CONF_NOTIFICATION_DESTINATION)
-    enabled = destination in ("phone", "both", "home_assistant") if destination else (
-        entry.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False) or entry.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
-    )
-    if not enabled:
+    """Start notification tracking only when at least one destination is enabled."""
+    if _destination(entry.options) == "none":
         return
     await EmlaLockSessionNotifications(hass, entry, coordinator).async_start()
