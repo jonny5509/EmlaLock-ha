@@ -146,6 +146,8 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
+                vol.Optional(CONF_NOTIFY_DAILY, default=options.get(CONF_NOTIFY_DAILY, True)): bool,
+                vol.Optional(CONF_NOTIFY_COMPLETION, default=options.get(CONF_NOTIFY_COMPLETION, True)): bool,
                 vol.Optional(CONF_NOTIFICATION_DESTINATION, default=destination): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=[
                         {"value": "none", "label": "None"},
