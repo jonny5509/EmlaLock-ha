@@ -24,7 +24,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 _CHECK_INTERVAL = timedelta(minutes=1)
-_PHONE_SERVICE = re.compile(r"notify\\.mobile_app_[a-z0-9_]+")
+_PHONE_SERVICE = re.compile(r"notify\.mobile_app_[a-z0-9_]+")
 _DAY_SECONDS = 86400
 
 
