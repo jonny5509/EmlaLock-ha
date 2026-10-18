@@ -155,7 +155,7 @@ class EmlaLockSessionNotifications:
         start = _timestamp(session.get("startdate"))
         now = datetime.now(timezone.utc).timestamp()
         user = data.get("user")
-        name = str(user.get("username") if isinstance(user, dict) else "" or "EmlaLock session")
+        name = str((user.get("username") if isinstance(user, dict) else None) or "EmlaLock session")
         changed = False
 
         if active and start is not None and start <= now:
@@ -178,7 +178,7 @@ class EmlaLockSessionNotifications:
             ):
                 title = "Session milestone reached"
                 message = f"🎉 Day {elapsed_days} complete for {name}. Keep it going!"
-                if await self._notify(title, message, f"daily_{elapsed_days}"):
+                if await self._notify(title, message, "daily"):
                     self.state["last_daily_day"] = elapsed_days
                     changed = True
         elif not active and self.state.get("active_seen") and not self.state.get("completion_notified"):
