@@ -141,4 +141,3 @@ The bundled card source/build files are maintained alongside the integration. Wh
 
 See [LICENSE](LICENSE) for the current project license.
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jonny5509)
