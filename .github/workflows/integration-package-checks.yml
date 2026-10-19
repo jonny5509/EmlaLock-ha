@@ -1,0 +1,78 @@
+name: Integration package checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  package-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate metadata, required files, branding, and release ZIP
+        run: |
+          python - <<'PY'
+          import json
+          import struct
+          import zipfile
+          from pathlib import Path
+
+          root = Path(".")
+          integration = root / "custom_components" / "emlalock"
+          required = [
+              integration / "manifest.json",
+              integration / "__init__.py",
+              integration / "config_flow.py",
+              integration / "strings.json",
+              integration / "translations" / "en.json",
+              integration / "brand" / "icon.png",
+              integration / "www" / "emlalock-card.js",
+              root / "hacs.json",
+          ]
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit("Missing required files:\n- " + "\n- ".join(missing))
+
+          manifest = json.loads((integration / "manifest.json").read_text())
+          hacs = json.loads((root / "hacs.json").read_text())
+          if manifest.get("domain") != "emlalock":
+              raise SystemExit("manifest.json domain must be 'emlalock'")
+          if not manifest.get("name") or not manifest.get("version"):
+              raise SystemExit("manifest.json must define name and version")
+          if manifest.get("config_flow") is not True:
+              raise SystemExit("manifest.json must enable config_flow")
+          if hacs.get("name") != "EmlaLock":
+              raise SystemExit("hacs.json name must be 'EmlaLock'")
+
+          icon = (integration / "brand" / "icon.png").read_bytes()
+          if len(icon) < 24 or icon[:8] != b"\x89PNG\r\n\x1a\n":
+              raise SystemExit("brand/icon.png is not a valid PNG")
+          width, height = struct.unpack(">II", icon[16:24])
+          if width < 64 or height < 64:
+              raise SystemExit(f"brand/icon.png is too small: {width}x{height}")
+
+          zip_path = root / "emlalock-validation.zip"
+          with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in integration.rglob("*"):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(integration).as_posix())
+
+          with zipfile.ZipFile(zip_path) as archive:
+              packaged = set(archive.namelist())
+              package_required = [
+                  "manifest.json",
+                  "config_flow.py",
+                  "brand/icon.png",
+                  "www/emlalock-card.js",
+              ]
+              absent = [name for name in package_required if name not in packaged]
+              if absent:
+                  raise SystemExit("Release ZIP is missing: " + ", ".join(absent))
+
+          print(f"Validated EmlaLock {manifest['version']}: metadata, {width}x{height} brand icon, and integration ZIP.")
+          PY
