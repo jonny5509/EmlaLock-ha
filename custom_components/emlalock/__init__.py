@@ -153,7 +153,7 @@ async def async_setup(hass: HomeAssistant, config):
                 service = str(target)
                 if not service.startswith("notify."):
                     service = f"notify.{service}"
-                if re.fullmatch(r"notify\\.mobile_app_[a-z0-9_]+", service) and service not in services:
+                if re.fullmatch(r"notify\.mobile_app_[a-z0-9_]+", service) and service not in services:
                     services.append(service)
             if not services:
                 raise HomeAssistantError(
