@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .api import EmlaLockApi, EmlaLockApiError
-from .const import (CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_ENABLE_NOTIFICATIONS, CONF_NOTIFICATION_SERVICE, CONF_NOTIFY_DAILY, CONF_NOTIFY_COMPLETION, CONF_NOTIFY_HA_DAILY, CONF_NOTIFY_HA_COMPLETION, DEFAULT_NOTIFICATION_SERVICE)
+from .const import (CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_NOTIFICATION_DESTINATION, CONF_NOTIFICATION_TARGETS, CONF_ENABLE_PHONE_NOTIFICATIONS, CONF_ENABLE_HA_NOTIFICATIONS, DEFAULT_NOTIFICATION_SERVICE)
 from .notifications import async_setup_notifications
 from .coordinator import EmlaLockCoordinator
 
@@ -110,23 +110,73 @@ async def async_setup(hass: HomeAssistant, config):
 
     async def test_notification(call: ServiceCall) -> None:
         entries = hass.config_entries.async_entries(DOMAIN)
-        entry = next((item for item in entries if item.options.get(CONF_ENABLE_NOTIFICATIONS, False)), None)
+        entry = next(
+            (
+                item for item in entries
+                if item.options.get(
+                    CONF_NOTIFICATION_DESTINATION,
+                    "both" if item.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+                    and item.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+                    else "phone" if item.options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+                    else "home_assistant" if item.options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+                    else "none",
+                ) in {"phone", "home_assistant", "both", "ha"}
+            ),
+            None,
+        )
         if entry is None:
-            raise HomeAssistantError("Enable notifications in EmlaLock integration options first")
+            raise HomeAssistantError(
+                "Choose a notification destination in EmlaLock integration options first"
+            )
+
         options = entry.options
-        mobile = options.get(CONF_NOTIFY_DAILY, False) or options.get(CONF_NOTIFY_COMPLETION, False)
-        persistent = options.get(CONF_NOTIFY_HA_DAILY, False) or options.get(CONF_NOTIFY_HA_COMPLETION, False)
-        if not mobile and not persistent:
-            raise HomeAssistantError("Enable at least one test destination in EmlaLock notification options")
+        destination = options.get(CONF_NOTIFICATION_DESTINATION, "none")
+        if destination == "ha":
+            destination = "home_assistant"
+        if destination not in {"none", "phone", "home_assistant", "both"}:
+            phone = options.get(CONF_ENABLE_PHONE_NOTIFICATIONS, False)
+            ha = options.get(CONF_ENABLE_HA_NOTIFICATIONS, False)
+            destination = "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
+        if destination == "none":
+            raise HomeAssistantError(
+                "Choose a notification destination in EmlaLock integration options first"
+            )
+
         title = "EmlaLock test notification"
         message = "This is a test notification. Your EmlaLock notification delivery is configured."
-        if mobile:
-            service = str(options.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE))
-            if not re.fullmatch(r"notify\.[a-z0-9_]+", service):
-                raise HomeAssistantError("Select a valid mobile notification service in EmlaLock options")
-            await hass.services.async_call("notify", service.split(".", 1)[1], {"title": title, "message": message}, blocking=True)
-        if persistent:
-            await hass.services.async_call("persistent_notification", "create", {"title": title, "message": message, "notification_id": f"emlalock_test_{entry.entry_id}"}, blocking=True)
+        if destination in {"phone", "both"}:
+            targets = options.get(CONF_NOTIFICATION_TARGETS, [])
+            if isinstance(targets, str):
+                targets = [targets]
+            services = []
+            for target in targets if isinstance(targets, list) else []:
+                service = str(target)
+                if not service.startswith("notify."):
+                    service = f"notify.{service}"
+                if re.fullmatch(r"notify\\.mobile_app_[a-z0-9_]+", service) and service not in services:
+                    services.append(service)
+            if not services:
+                raise HomeAssistantError(
+                    "Select at least one Home Assistant Companion App phone in EmlaLock options"
+                )
+            for service in services:
+                await hass.services.async_call(
+                    "notify",
+                    service.split(".", 1)[1],
+                    {"title": title, "message": message},
+                    blocking=True,
+                )
+        if destination in {"home_assistant", "both"}:
+            await hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": title,
+                    "message": message,
+                    "notification_id": f"emlalock_test_{entry.entry_id}",
+                },
+                blocking=True,
+            )
 
     if not hass.services.has_service(DOMAIN, "test_notification"):
         hass.services.async_register(DOMAIN, "test_notification", test_notification, schema=vol.Schema({}))
