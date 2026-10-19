@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .api import EmlaLockApi, EmlaLockApiError
-from .const import (CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_NOTIFICATION_DESTINATION, CONF_NOTIFICATION_TARGETS, CONF_ENABLE_PHONE_NOTIFICATIONS, CONF_ENABLE_HA_NOTIFICATIONS, DEFAULT_NOTIFICATION_SERVICE)
+from .const import (CONF_API_KEY, CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_NOTIFICATION_DESTINATION, CONF_NOTIFICATION_TARGETS, CONF_ENABLE_PHONE_NOTIFICATIONS, CONF_ENABLE_HA_NOTIFICATIONS)
 from .notifications import async_setup_notifications
 from .coordinator import EmlaLockCoordinator
 
