@@ -8,11 +8,13 @@ from homeassistant.core import callback
 
 from .api import EmlaLockApi, EmlaLockApiError
 from .const import (
-    CONF_HOLDER_API_KEY, CONF_USER_ID, DOMAIN, CONF_ENABLE_NOTIFICATIONS, CONF_ENABLE_PHONE_NOTIFICATIONS, CONF_ENABLE_HA_NOTIFICATIONS,
-    CONF_NOTIFICATION_SERVICE, CONF_NOTIFY_DAILY, CONF_NOTIFY_COMPLETION,
-    CONF_NOTIFY_HA_DAILY, CONF_NOTIFY_HA_COMPLETION,
-    DEFAULT_NOTIFICATION_SERVICE,
-    CONF_NOTIFICATION_DESTINATION, CONF_NOTIFICATION_TARGETS,
+    CONF_HOLDER_API_KEY,
+    CONF_USER_ID,
+    DOMAIN,
+    CONF_NOTIFICATION_DESTINATION,
+    CONF_NOTIFICATION_TARGETS,
+    CONF_NOTIFY_DAILY,
+    CONF_NOTIFY_COMPLETION,
 )
 
 
@@ -134,15 +136,6 @@ class EmlaLockOptionsFlow(config_entries.OptionsFlow):
             phone = options.get("enable_phone_notifications", False)
             ha = options.get("enable_ha_notifications", False)
             destination = "both" if phone and ha else "phone" if phone else "home_assistant" if ha else "none"
-        notify_services = sorted(name for name in self.hass.services.async_services().get("notify", {}) if name.startswith("mobile_app_"))
-        service_options = [
-            {"value": f"notify.{name}", "label": name.removeprefix("mobile_app_").replace("_", " ")}
-            for name in notify_services
-        ]
-        for target in options.get(CONF_NOTIFICATION_TARGETS, []):
-            service_name = str(target).removeprefix("notify.")
-            if service_name.startswith("mobile_app_") and all(item["value"] != f"notify.{service_name}" for item in service_options):
-                service_options.append({"value": f"notify.{service_name}", "label": service_name.removeprefix("mobile_app_").replace("_", " ")})
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
