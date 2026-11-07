@@ -166,7 +166,7 @@ class EmlaLockCard extends HTMLElement {
           <h2 class="heading">${title}</h2>
           <div class="sensors">
             ${visibleRows.length ? visibleRows.map(([label, entity], index) =>
-              this._row(["◉", "⏱", "⌛", "▶", "■", "↓", "↑", "🔗"][rows.indexOf(rows.find((row) => row[0] === label))] || "•", label, this._value(entity))
+              this._row(["⏱", "⌛", "◷"][rows.findIndex((row) => row[0] === label)], label, this._value(entity))
             ).join("") : '<div class="empty">No EmlaLock entities found. Check that the integration is loaded, or set entity IDs in the card configuration.</div>'}
           </div>
           ${showActions ? `
