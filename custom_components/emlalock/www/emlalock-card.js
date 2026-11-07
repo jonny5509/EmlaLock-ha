@@ -27,7 +27,7 @@ class EmlaLockCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config?.show_actions === false ? 5 : 7;
+    return 8;
   }
 
   static getStubConfig() {
@@ -76,7 +76,7 @@ class EmlaLockCard extends HTMLElement {
 
   _value(entity) {
     if (!entity || entity.state === "unknown" || entity.state === "unavailable") {
-      return "Not available";
+      return "—";
     }
     try {
       if (typeof this._hass?.formatEntityState === "function") {
@@ -121,7 +121,7 @@ class EmlaLockCard extends HTMLElement {
       entity: this._findButton(action.key, action.suffix),
     }));
 
-    const visibleRows = rows.filter(([, entity]) => entity);
+    const visibleRows = rows;
     const title = this._escape(this._config.title || "EmlaLock");
     const showActions = this._config.show_actions !== false;
 
@@ -142,7 +142,7 @@ class EmlaLockCard extends HTMLElement {
         .row {
           display: flex; align-items: center; min-height: 62px; min-width: 0;
           box-sizing: border-box; padding: 10px 12px; border-radius: 12px;
-          background: var(--ha-card-background, var(--secondary-background-color));
+          background: var(--secondary-background-color);
           border: 1px solid var(--divider-color);
         }
         .row-icon { width: 34px; flex: 0 0 34px; color: var(--secondary-text-color); font-size: 20px; text-align: center; }
