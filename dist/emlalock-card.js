@@ -1,8 +1,7 @@
 /* EmlaLock Lovelace card
- * Automatically loaded and registered by the EmlaLock integration.
- * No manual Lovelace resource is required.
+ * Dashboard-safe custom card. Supports automatic entity discovery and
+ * optional explicit entity IDs for installations with renamed entities.
  */
-
 class EmlaLockCard extends HTMLElement {
   constructor() {
     super();
@@ -10,10 +9,15 @@ class EmlaLockCard extends HTMLElement {
     this._hass = null;
     this._root = document.createElement("div");
     this.shadowRoot.appendChild(this._root);
+    this._config = {};
+    this._busy = new Set();
   }
 
   setConfig(config) {
-    this._config = config || {};
+    if (!config || typeof config !== "object") {
+      throw new Error("EmlaLock Card: configuration must be an object");
+    }
+    this._config = { ...config };
     this._render();
   }
 
@@ -23,190 +27,197 @@ class EmlaLockCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 6;
+    return this._config?.show_actions === false ? 5 : 7;
   }
 
-  _findEntity(...suffixes) {
-    if (!this._hass?.states) return null;
-    const states = Object.values(this._hass.states);
+  static getStubConfig() {
+    return { type: "custom:emlalock-card" };
+  }
+
+  _states() {
+    return this._hass?.states ? Object.values(this._hass.states) : [];
+  }
+
+  _findEntity(key, ...suffixes) {
+    const configured = this._config?.entities?.[key];
+    if (configured && this._hass?.states?.[configured]) {
+      return this._hass.states[configured];
+    }
     const wanted = suffixes.map((value) => value.toLowerCase());
-    return states.find((item) => {
-      const id = item.entity_id.toLowerCase();
-      const name = String(item.attributes?.friendly_name || "").toLowerCase();
+    return this._states().find((entity) => {
+      const id = String(entity.entity_id || "").toLowerCase();
+      const name = String(entity.attributes?.friendly_name || "").toLowerCase();
       if (!id.includes("emlalock") && !name.includes("emlalock")) return false;
       return wanted.some((suffix) =>
-        id.endsWith(`_${suffix}`) || name === `emlalock ${suffix.replaceAll("_", " ")}`
+        id.endsWith("_" + suffix) ||
+        name === "emlalock " + suffix.replaceAll("_", " ") ||
+        name.replaceAll(" ", "_").endsWith("_" + suffix)
       );
     }) || null;
   }
 
-  _value(entity, fallback = "—") {
-    if (!entity || entity.state === "unknown" || entity.state === "unavailable") return fallback;
+  _findButton(key, ...suffixes) {
+    const configured = this._config?.entities?.[key];
+    if (configured && this._hass?.states?.[configured]) {
+      return this._hass.states[configured];
+    }
+    const wanted = suffixes.map((value) => value.toLowerCase());
+    return this._states().find((entity) => {
+      const id = String(entity.entity_id || "").toLowerCase();
+      if (!id.startsWith("button.")) return false;
+      const name = String(entity.attributes?.friendly_name || "").toLowerCase();
+      return wanted.some((suffix) =>
+        id.endsWith("_" + suffix) ||
+        name === "emlalock " + suffix.replaceAll("_", " ") ||
+        name.replaceAll(" ", "_").endsWith("_" + suffix)
+      );
+    }) || null;
+  }
+
+  _value(entity) {
+    if (!entity || entity.state === "unknown" || entity.state === "unavailable") {
+      return "Not available";
+    }
+    try {
+      if (typeof this._hass?.formatEntityState === "function") {
+        return this._hass.formatEntityState(entity);
+      }
+    } catch (_error) {
+      // Fall back to the raw state for older Home Assistant versions.
+    }
     return entity.state;
   }
 
-  _findButton(...suffixes) {
-    if (!this._hass?.states) return null;
-    const wanted = suffixes.map((value) => value.toLowerCase());
-    return Object.values(this._hass.states).find((item) => {
-      if (!item.entity_id.toLowerCase().startsWith("button.")) return false;
-      const id = item.entity_id.toLowerCase();
-      const name = String(item.attributes?.friendly_name || "").toLowerCase();
-      if (!id.includes("emlalock") && !name.includes("emlalock")) return false;
-      return wanted.some((suffix) =>
-        id.endsWith(`_${suffix}`) || name === `emlalock ${suffix.replaceAll("_", " ")}`
-      );
-    }) || null;
-  }
-
-  async _press(entityId) {
-    if (!this._hass || !entityId) return;
-    await this._hass.callService("button", "press", { entity_id: entityId });
+  async _press(entityId, index) {
+    if (!this._hass || !entityId || this._busy.has(index)) return;
+    this._busy.add(index);
+    this._render();
+    try {
+      await this._hass.callService("button", "press", { entity_id: entityId });
+    } catch (error) {
+      console.error("EmlaLock Card: unable to run button action", error);
+    } finally {
+      this._busy.delete(index);
+      this._render();
+    }
   }
 
   _render() {
-    if (!this._hass) return;
+    if (!this.shadowRoot || !this._hass) return;
 
-    const passed = this._findEntity("time_in_lock", "time_passed", "passed");
-    const remaining = this._findEntity("time_remaining", "remaining");
-    const maximum = this._findEntity("maximum", "maximum_duration");
-    const minimum = this._findEntity("minimum", "minimum_duration");
+    const rows = [
+      ["Session", this._findEntity("session", "session")],
+      ["Time elapsed", this._findEntity("time_passed", "time_passed", "time_in_lock", "passed")],
+      ["Time remaining", this._findEntity("time_remaining", "time_remaining", "remaining")],
+      ["Start date", this._findEntity("start_date", "start_date")],
+      ["End date", this._findEntity("end_date", "end_date")],
+      ["Minimum", this._findEntity("minimum", "minimum", "minimum_duration")],
+      ["Maximum", this._findEntity("maximum", "maximum", "maximum_duration")],
+      ["Requirement links", this._findEntity("requirements", "requirements", "requirement_links")],
+    ];
 
-    const buttons = [
-      ["−1 hour", "subtract_1_hour", "subtract_1_hour", "subtract 1 hour"],
-      ["+1 hour", "add_1_hour", "add_1_hour", "add 1 hour"],
-      ["−1 day", "subtract_1_day", "subtract_1_day", "subtract 1 day"],
-      ["+1 day", "add_1_day", "add_1_day", "add 1 day"],
-    ].map(([label, ...suffixes]) => ({
-      label,
-      entity: this._findButton(...suffixes),
+    const actions = [
+      { label: "−1 hour", key: "subtract_1_hour", suffix: "subtract_1_hour" },
+      { label: "+1 hour", key: "add_1_hour", suffix: "add_1_hour" },
+      { label: "−1 day", key: "subtract_1_day", suffix: "subtract_1_day" },
+      { label: "+1 day", key: "add_1_day", suffix: "add_1_day" },
+    ].map((action) => ({
+      ...action,
+      entity: this._findButton(action.key, action.suffix),
     }));
+
+    const visibleRows = rows.filter(([, entity]) => entity);
+    const title = this._escape(this._config.title || "EmlaLock");
+    const showActions = this._config.show_actions !== false;
 
     this._root.innerHTML = `
       <style>
-        :host { display: block; }
+        :host { display: block; min-width: 0; }
         ha-card {
           overflow: hidden;
-          border-radius: 24px;
-          background: #1b1d1e;
-          color: #f4f5f7;
-          border: 1px solid #34383b;
-          box-shadow: none;
+          color: var(--primary-text-color);
+          background: var(--ha-card-background, var(--card-background-color, var(--paper-card-background-color)));
+          border: 1px solid var(--divider-color);
+          border-radius: var(--ha-card-border-radius, 16px);
+          box-shadow: var(--ha-card-box-shadow, none);
         }
-        .card {
-          padding: 16px;
-          font-family: var(--paper-font-body1_-_font-family, Arial, sans-serif);
-        }
-        .sensors {
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
+        .card { padding: 16px; font-family: var(--paper-font-body1_-_font-family, inherit); }
+        .heading { margin: 0 0 12px; color: var(--primary-text-color); font-size: 1.15rem; font-weight: 600; }
+        .sensors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 8px; }
         .row {
-          display: flex;
-          align-items: center;
-          min-height: 65px;
-          border-radius: 17px;
-          background: #242729;
-          padding: 10px 14px;
-          box-sizing: border-box;
+          display: flex; align-items: center; min-height: 62px; min-width: 0;
+          box-sizing: border-box; padding: 10px 12px; border-radius: 12px;
+          background: var(--ha-card-background, var(--secondary-background-color));
+          border: 1px solid var(--divider-color);
         }
-        .row-icon {
-          width: 40px;
-          flex: 0 0 40px;
-          color: #d8dde5;
-          font-size: 24px;
-          text-align: center;
-        }
-        .row-content {
-          min-width: 0;
-          flex: 1;
-          padding-left: 8px;
-        }
-        .label {
-          color: #aeb7c5;
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: .6px;
-          text-transform: uppercase;
-        }
-        .value {
-          color: #f4f5f7;
-          font-size: 18px;
-          font-weight: 600;
-          margin-top: 4px;
-          overflow-wrap: anywhere;
-        }
-        .actions {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 9px;
-          margin-top: 12px;
-        }
+        .row-icon { width: 34px; flex: 0 0 34px; color: var(--secondary-text-color); font-size: 20px; text-align: center; }
+        .row-content { min-width: 0; flex: 1; padding-left: 8px; }
+        .label { color: var(--secondary-text-color); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+        .value { margin-top: 4px; color: var(--primary-text-color); font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+        .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
         .action {
-          min-height: 48px;
-          border: 0;
-          border-radius: 15px;
-          background: #242729;
-          color: #f4f5f7;
-          font: inherit;
-          font-weight: 700;
-          cursor: pointer;
+          min-width: 0; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px;
+          background: var(--primary-color); color: var(--text-primary-color, white);
+          font: inherit; font-weight: 600; cursor: pointer;
         }
-        .action:hover:not(:disabled) { background: #303437; }
-        .action:disabled { opacity: .42; cursor: default; }
-        @media (max-width: 430px) {
-          .row { min-height: 61px; }
-          .value { font-size: 16px; }
-        }
+        .action:hover:not(:disabled) { filter: brightness(1.08); }
+        .action:focus-visible { outline: 2px solid var(--primary-text-color); outline-offset: 2px; }
+        .action:disabled { opacity: .45; cursor: not-allowed; }
+        .empty { color: var(--secondary-text-color); padding: 8px 0; }
+        @media (max-width: 360px) { .card { padding: 12px; } .value { font-size: 14px; } }
       </style>
       <ha-card>
         <div class="card">
+          <h2 class="heading">${title}</h2>
           <div class="sensors">
-            ${this._row("⏱", "Time elapsed", this._value(passed))}
-            ${this._row("⌛", "Time remaining", this._value(remaining))}
-            ${this._row("⏱", "Minimum", this._value(minimum))}
-            ${this._row("⏱", "Maximum", this._value(maximum))}
+            ${visibleRows.length ? visibleRows.map(([label, entity], index) =>
+              this._row(["◉", "⏱", "⌛", "▶", "■", "↓", "↑", "🔗"][rows.indexOf(rows.find((row) => row[0] === label))] || "•", label, this._value(entity))
+            ).join("") : '<div class="empty">No EmlaLock entities found. Check that the integration is loaded, or set entity IDs in the card configuration.</div>'}
           </div>
-          <div class="actions">
-            ${buttons.map((button, index) => `
-              <button class="action" data-action="${index}" ${!button.entity || button.entity.state === "unavailable" ? "disabled" : ""}>
-                ${button.label}
-              </button>
-            `).join("")}
-          </div>
+          ${showActions ? `
+            <div class="actions">
+              ${actions.map((action, index) => `
+                <button class="action" data-action="${index}" ${!action.entity || ["unavailable", "unknown"].includes(action.entity.state) || this._busy.has(index) ? "disabled" : ""}>
+                  ${this._busy.has(index) ? "Working…" : action.label}
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
         </div>
       </ha-card>
     `;
 
     this.shadowRoot.querySelectorAll(".action").forEach((element) => {
       element.addEventListener("click", () => {
-        const button = buttons[Number(element.dataset.action)];
-        if (button?.entity) this._press(button.entity.entity_id);
+        const index = Number(element.dataset.action);
+        const action = actions[index];
+        if (action?.entity) this._press(action.entity.entity_id, index);
       });
     });
   }
 
   _row(icon, label, value) {
-    return `<div class="row"><div class="row-icon">${icon}</div><div class="row-content"><div class="label">${label}</div><div class="value">${this._escape(value)}</div></div></div>`;
+    return `<div class="row"><div class="row-icon" aria-hidden="true">${icon}</div><div class="row-content"><div class="label">${this._escape(label)}</div><div class="value">${this._escape(value)}</div></div></div>`;
   }
 
   _escape(value) {
     return String(value ?? "—")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
   }
 }
 
-customElements.define("emlalock-card", EmlaLockCard);
+if (!customElements.get("emlalock-card")) {
+  customElements.define("emlalock-card", EmlaLockCard);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "emlalock-card",
-  name: "EmlaLock Card",
-  description: "A minimal EmlaLock card showing elapsed, remaining, minimum, and maximum time with four duration controls.",
-  preview: true,
-});
+if (!window.customCards.some((card) => card.type === "emlalock-card")) {
+  window.customCards.push({
+    type: "emlalock-card",
+    name: "EmlaLock Card",
+    description: "Session information and duration controls for EmlaLock.",
+    preview: true,
+    documentationURL: "https://github.com/jonny5509/EmlaLock-ha",
+  });
+}
