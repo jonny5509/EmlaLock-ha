@@ -103,7 +103,7 @@ type: custom:emlalock-card
 title: EmlaLock
 show_actions: true
 entities:
-  session: binary_sensor.emlalock_session_active
+  session: sensor.emlalock_session
   time_passed: sensor.emlalock_time_passed
   time_remaining: sensor.emlalock_time_remaining
   start_date: sensor.emlalock_start_date
