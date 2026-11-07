@@ -106,21 +106,16 @@ class EmlaLockCard extends HTMLElement {
     if (!this.shadowRoot || !this._hass) return;
 
     const rows = [
-      ["Session", this._findEntity("session", "session")],
-      ["Time elapsed", this._findEntity("time_passed", "time_passed", "time_in_lock", "passed")],
+      ["Time locked / elapsed", this._findEntity("time_passed", "time_passed", "time_in_lock", "passed")],
       ["Time remaining", this._findEntity("time_remaining", "time_remaining", "remaining")],
-      ["Start date", this._findEntity("start_date", "start_date")],
-      ["End date", this._findEntity("end_date", "end_date")],
-      ["Minimum", this._findEntity("minimum", "minimum", "minimum_duration")],
-      ["Maximum", this._findEntity("maximum", "maximum", "maximum_duration")],
-      ["Requirement links", this._findEntity("requirements", "requirements", "requirement_links")],
+      ["Maximum duration", this._findEntity("maximum", "maximum", "maximum_duration")],
     ];
 
     const actions = [
-      { label: "−1 hour", key: "subtract_1_hour", suffix: "subtract_1_hour" },
       { label: "+1 hour", key: "add_1_hour", suffix: "add_1_hour" },
-      { label: "−1 day", key: "subtract_1_day", suffix: "subtract_1_day" },
+      { label: "−1 hour", key: "subtract_1_hour", suffix: "subtract_1_hour" },
       { label: "+1 day", key: "add_1_day", suffix: "add_1_day" },
+      { label: "−1 day", key: "subtract_1_day", suffix: "subtract_1_day" },
     ].map((action) => ({
       ...action,
       entity: this._findButton(action.key, action.suffix),
