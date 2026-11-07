@@ -47,6 +47,7 @@ class EmlaLockCard extends HTMLElement {
     return this._states().find((entity) => {
       const id = String(entity.entity_id || "").toLowerCase();
       const name = String(entity.attributes?.friendly_name || "").toLowerCase();
+      if (!id.includes("emlalock") && !name.includes("emlalock")) return false;
       return wanted.some((suffix) =>
         id.endsWith("_" + suffix) ||
         name === "emlalock " + suffix.replaceAll("_", " ") ||
