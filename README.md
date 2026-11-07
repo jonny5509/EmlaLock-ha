@@ -93,6 +93,32 @@ After installation and restart:
 
 A custom integration cannot silently modify an existing user's dashboard. EmlaLock can install, load, and register the card automatically, but adding the card to an existing dashboard remains a dashboard UI action.
 
+
+### Advanced card configuration
+
+The card works with automatic EmlaLock entity discovery. If you have renamed entities, or Home Assistant has added an entity-ID suffix because you have more than one device, you can pin the entity IDs explicitly:
+
+```yaml
+type: custom:emlalock-card
+title: EmlaLock
+show_actions: true
+entities:
+  session: binary_sensor.emlalock_session_active
+  time_passed: sensor.emlalock_time_passed
+  time_remaining: sensor.emlalock_time_remaining
+  start_date: sensor.emlalock_start_date
+  end_date: sensor.emlalock_end_date
+  minimum: sensor.emlalock_minimum_duration
+  maximum: sensor.emlalock_maximum_duration
+  requirements: sensor.emlalock_requirement_links
+  add_1_hour: button.emlalock_add_1_hour
+  subtract_1_hour: button.emlalock_subtract_1_hour
+  add_1_day: button.emlalock_add_1_day
+  subtract_1_day: button.emlalock_subtract_1_day
+```
+
+All entries under `entities` are optional. Omit an entry to let the card discover it automatically. Set `show_actions: false` to display information without the duration buttons. Entity IDs above are examples; use the IDs shown in **Settings → Devices & services → Entities** in your installation.
+
 ## 🔄 Updates
 
 After a HACS update:
