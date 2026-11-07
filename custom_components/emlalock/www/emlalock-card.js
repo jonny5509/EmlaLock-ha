@@ -7,6 +7,8 @@ class EmlaLockCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._hass = null;
+    this._root = document.createElement("div");
+    this.shadowRoot.appendChild(this._root);
     this._config = {};
     this._busy = new Set();
   }
