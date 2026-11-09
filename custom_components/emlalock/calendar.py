@@ -26,6 +26,47 @@ def _session(coordinator: EmlaLockCoordinator) -> dict[str, Any]:
     return session if isinstance(session, dict) else {}
 
 
+def _is_active(session: dict[str, Any]) -> bool:
+    """Whether an EmlaLock session payload reports an active session."""
+    status_value = session.get("status")
+    return status_value is True or str(status_value).lower() in {
+        "active",
+        "true",
+        "1",
+        "running",
+    }
+
+
+def _format_duration(start: datetime, end: datetime) -> str | None:
+    """Format the elapsed time of a completed session for its description."""
+    total = int((end - start).total_seconds())
+    if total <= 0 or end <= start:
+        return None
+    minutes = total // 60
+    if minutes <= 0:
+        return f"{total}s"
+    days, remainder = divmod(minutes, 24 * 60)
+    hours, mins = divmod(remainder, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if days or hours or mins:
+        parts.append(f"{mins}m")
+    return " ".join(parts)
+
+
+def _with_duration(description: str, start: datetime, end: datetime) -> str:
+    """Append the session duration to a completed event's description."""
+    duration = _format_duration(start, end)
+    if duration is None:
+        return description
+    if description:
+        return f"{description}\nDuration: {duration}"
+    return f"Duration: {duration}"
+
+
 def _datetime_value(value: Any) -> datetime | None:
     """Parse Unix timestamps or ISO date strings into aware UTC datetimes."""
     if value is None or value == "" or isinstance(value, bool):
@@ -117,8 +158,7 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         user = data.get("user", {})
         username = user.get("username") if isinstance(user, dict) else None
         session_id = str(session.get("chastitysessionid") or f"{start.timestamp():.0f}")
-        status_value = session.get("status")
-        active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
+        active = _is_active(session)
         title = self._summary_for_start(start)
         now = datetime.now(timezone.utc)
         # A scheduled end time is not proof that the session ended. Keep an
@@ -142,11 +182,20 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         current = self._current_event()
         if current is None:
             return None
-        session = _session(self.coordinator)
-        status_value = session.get("status")
-        active = status_value is True or str(status_value).lower() in {"active", "true", "1", "running"}
-        if not active:
-            return current
+        if not _is_active(_session(self.coordinator)):
+            # Ended sessions keep timed bounds capped at the observed end,
+            # showing how long the session actually lasted instead of the
+            # whole calendar day.
+            end_dt = min(current.end, datetime.now(timezone.utc))
+            if end_dt <= current.start:
+                return current
+            return CalendarEvent(
+                summary=current.summary,
+                start=current.start,
+                end=end_dt,
+                description=_with_duration(current.description or "", current.start, end_dt),
+                uid=current.uid,
+            )
         local_start = as_local(current.start)
         event_day = local_start.date()
         summary = (
@@ -178,20 +227,48 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
 
     def _record_current(self) -> None:
         event = self._current_event()
+        session_active = event is not None and _is_active(_session(self.coordinator))
         changed = False
         active_records = [item for item in self._history if item.get("active")]
+        now = datetime.now(timezone.utc)
         if event is not None:
-            start = event.start.astimezone(timezone.utc).isoformat()
-            end = event.end.astimezone(timezone.utc).isoformat()
+            start_dt = event.start.astimezone(timezone.utc)
+            if session_active:
+                end_dt = event.end.astimezone(timezone.utc)
+            else:
+                # The session is already ended. Supersede a still-future
+                # scheduled end with the observed end so the calendar shows
+                # how long the session actually lasted, not a full day.
+                end_dt = min(event.end.astimezone(timezone.utc), now)
+                if end_dt <= start_dt:
+                    # Upcoming or zero-length entry: close replaced sessions
+                    # but do not persist a new history record for it.
+                    for item in active_records:
+                        if item.get("uid") != event.uid:
+                            item["end"] = now.isoformat()
+                            item["active"] = False
+                            changed = True
+                    if changed:
+                        self._queue_save()
+                    return
+            start = start_dt.isoformat()
+            end = end_dt.isoformat()
             for item in active_records:
                 if item.get("uid") != event.uid:
+                    # A new session replaced the previous one without an
+                    # empty snapshot between them. Close it at observation
+                    # time so it becomes a timed history entry.
+                    item["end"] = now.isoformat()
                     item["active"] = False
                     changed = True
             record = next((item for item in self._history if item.get("uid") == event.uid), None)
+            description = event.description or ""
+            if not session_active:
+                description = _with_duration(description, start_dt, end_dt)
             serialized = {
                 "uid": str(event.uid), "summary": event.summary,
-                "description": event.description or "", "start": start, "end": end,
-                "active": True,
+                "description": description, "start": start, "end": end,
+                "active": session_active,
             }
             if record is None:
                 self._history.append(serialized)
@@ -200,9 +277,15 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
                 record.update(serialized)
                 changed = True
         else:
-            # No current session: close any previously active records, retaining
-            # their last known title, start, scheduled end and session details.
+            # No current session: close any previously active records at the
+            # observed time so they reappear as timed entries spanning only
+            # how long the session ran, not as all-day blocks. Skip this
+            # before the coordinator's first fetch (data is None), so an
+            # active session surviving a restart is not closed at startup.
+            if not isinstance(self.coordinator.data, dict):
+                return
             for item in active_records:
+                item["end"] = now.isoformat()
                 item["active"] = False
                 changed = True
         if changed:
@@ -216,15 +299,41 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
         current = self._current_event()
+        session_active = current is not None and _is_active(_session(self.coordinator))
         records = [dict(item) for item in self._history]
         if current is not None:
             records = [item for item in records if item.get("uid") != current.uid]
+            start_dt = current.start.astimezone(timezone.utc)
+            end_dt = current.end.astimezone(timezone.utc)
+            description = current.description or ""
+            if not session_active:
+                # Ended but still present in the API payload: present it as a
+                # timed entry spanning its actual duration, not as all-day.
+                end_dt = min(end_dt, datetime.now(timezone.utc))
+                description = _with_duration(description, start_dt, end_dt)
             records.append({
                 "uid": str(current.uid), "summary": current.summary,
-                "description": current.description or "",
-                "start": current.start.astimezone(timezone.utc).isoformat(),
-                "end": current.end.astimezone(timezone.utc).isoformat(), "active": True,
+                "description": description,
+                "start": start_dt.isoformat(),
+                "end": end_dt.isoformat(), "active": session_active,
             })
+        elif isinstance(self.coordinator.data, dict):
+            # Coordinator data is known and reports no current session, so any
+            # still-active history records belonged to sessions that already
+            # ended. Present them as timed entries capped at observation time
+            # instead of leaving them as lingering all-day blocks.
+            now = datetime.now(timezone.utc)
+            for item in records:
+                if not item.get("active"):
+                    continue
+                parsed_start = _parse_saved(item.get("start"))
+                parsed_end = _parse_saved(item.get("end"))
+                if parsed_start is None or parsed_end is None:
+                    continue
+                capped_end = min(parsed_end, now)
+                if capped_end > parsed_start:
+                    item["end"] = capped_end.isoformat()
+                item["active"] = False
         start_bound = start_date.astimezone(timezone.utc) if start_date.tzinfo else start_date.replace(tzinfo=timezone.utc)
         end_bound = end_date.astimezone(timezone.utc) if end_date.tzinfo else end_date.replace(tzinfo=timezone.utc)
         events: list[CalendarEvent] = []
@@ -262,6 +371,8 @@ class EmlaLockSessionCalendar(CoordinatorEntity[EmlaLockCoordinator], CalendarEn
                     segment_start = segment_end
                     first_segment = False
             else:
+                if "Duration:" not in description:
+                    description = _with_duration(description, start, end)
                 events.append(CalendarEvent(
                     summary=str(item.get("summary") or "EmlaLock session"),
                     start=start, end=end, description=description,
